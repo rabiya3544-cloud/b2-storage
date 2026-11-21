@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Config Viewer</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --bg-2: #161a20;
+    --border: #232a33;
+    --text: #e6e9ee;
+    --text-faint: #8a93a3;
+    --teal: #4fd1c5;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --green: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    padding: 24px;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; letter-spacing: .05em; }
+  .sub { color: var(--text-faint); font-size: 11px; margin-bottom: 20px; }
+  .warn {
+    background: #2a1a1a; border: 1px solid #4a2a2a; color: #fca5a5;
+    padding: 10px 12px; border-radius: 4px; margin-bottom: 20px;
+    font-size: 11px; line-height: 1.5;
+  }
+  .warn strong { color: #fecaca; }
+  .row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  input {
+    background: var(--bg-2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 4px; font-family: inherit; font-size: 12px;
+    flex: 1; min-width: 200px;
+  }
+  input:focus { outline: none; border-color: var(--teal); }
+  button {
+    background: var(--teal); color: #0f1115; border: 0; padding: 6px 16px;
+    border-radius: 4px; font-family: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: wait; }
+  .status { color: var(--text-faint); font-size: 11px; }
+  .status.ok { color: var(--teal); }
+  .status.err { color: var(--red); }
+
+  .group-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--text-faint); margin: 22px 0 8px; padding-left: 2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .group-title::after {
+    content: ""; flex: 1; height: 1px; background: var(--border);
+  }
+
+  table {
+    width: 100%; border-collapse: collapse; background: var(--bg-2);
+    border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  }
+  th, td {
+    text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    color: var(--text-faint); font-weight: 500; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .1em;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td.key { color: var(--text-faint); width: 320px; white-space: nowrap; }
+  td.val { word-break: break-all; }
+  .secret {
+    background: #3a2a1a; color: var(--yellow); padding: 1px 4px; border-radius: 3px;
+    font-size: 11px;
+  }
+  .copy {
+    background: transparent; border: 1px solid var(--border); color: var(--text-faint);
+    padding: 2px 8px; font-size: 10px; border-radius: 3px; cursor: pointer;
+    margin-left: 8px;
+  }
+  .copy:hover { color: var(--teal); border-color: var(--teal); }
+  .null { color: var(--text-faint); font-style: italic; }
+  .badge {
+    display: inline-block; font-size: 10px; padding: 1px 6px;
+    border-radius: 20px; background: rgba(79,209,197,.12);
+    color: var(--teal); border: 1px solid rgba(79,209,197,.3);
+    margin-left: 6px;
+  }
+  .badge.warn { background: rgba(251,191,36,.12); color: var(--yellow);
+    border-color: rgba(251,191,36,.3); }
+  .badge.err { background: rgba(248,113,113,.12); color: var(--red);
+    border-color: rgba(248,113,113,.3); }
+
+  #raw {
+    margin-top: 20px; background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 12px; white-space: pre-wrap; word-break: break-all;
+    font-size: 11px; color: var(--text-faint); max-height: 400px; overflow: auto;
+  }
+  #raw:empty { display: none; }
+
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+    td.key { width: auto; white-space: normal; }
+    th, td { padding: 6px 8px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Config Viewer</h1>
+<div class="sub">GET https://b2-turso-vercel.vercel.app/api/config</div>
+
+<div class="warn">
+  ⚠️ <strong>Secrets in this response.</strong> Application keys and
+  Turso auth tokens are redacted as <code>***set***</code>, but B2 key
+  IDs and bucket names are visible. Close the tab, remove the server
+  route, and rotate every secret shown below — in the same deploy.
+</div>
+
+<div class="row">
+  <input id="apiKey" type="password" placeholder="X-API-Key" value="3544" />
+  <input id="reveal" type="text" placeholder="reveal=1 (optional)"
+         style="max-width:160px;flex:0 0 auto" />
+  <button id="loadBtn">Load</button>
+  <span class="status" id="status">idle</span>
+</div>
+
+<div id="groups"></div>
+<div id="raw"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const BASE = 'https://b2-storage-kappa.vercel.app/api/config';
+
+  // Regex for redaction, applied to the *value*
+  const REDACTED = '***set***';
+
+  // Prefixes that identify a group section
+  const GROUP_LABELS = [
+    { match: (k) => /^B2_.*_ONE$/.test(k), label: 'Group 1 (_ONE)' },
+    { match: (k) => /^B2_.*_TWO$/.test(k), label: 'Group 2 (_TWO)' },
+    { match: (k) => /^B2_/.test(k),         label: 'Group 0 (default)' },
+    { match: (k) => /^TURSO_/.test(k),      label: 'Turso' },
+    { match: (k) => /^VERCEL_|^NODE_ENV$/.test(k), label: 'Deployment' },
+  ];
+
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function isRedacted(v) {
+    return typeof v === 'string' && v === REDACTED;
+  }
+
+  function isSecretName(key) {
+    return /APPLICATION_KEY$|AUTH_TOKEN$|API_PASSWORD$|SECRET|TOKEN|PASSWORD/i.test(key);
+  }
+
+  function setStatus(text, cls) {
+    const el = $('status');
+    el.textContent = text;
+    el.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function buildTable(rows) {
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Env var</th><th>Value</th></tr>';
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const [key, val] of rows) {
+      const tr = document.createElement('tr');
+
+      const tdKey = document.createElement('td');
+      tdKey.className = 'key';
+      tdKey.textContent = key;
+
+      const tdVal = document.createElement('td');
+      tdVal.className = 'val';
+
+      if (val == null || val === '') {
+        tdVal.innerHTML = '<span class="null">(not set)</span>';
+      } else if (isRedacted(val)) {
+        tdVal.innerHTML = `<span class="secret">${escHtml(val)}</span>`;
+      } else if (isSecretName(key)) {
+        // Value wasn't redacted by the server, but the name looks sensitive
+        // (only happens if you passed ?reveal=1)
+        tdVal.innerHTML = `<span class="secret">${escHtml(val)}</span>`;
+        appendCopy(tdVal, val);
+      } else {
+        tdVal.textContent = String(val);
+        appendCopy(tdVal, val);
+      }
+
+      tr.appendChild(tdKey);
+      tr.appendChild(tdVal);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function appendCopy(tdVal, val) {
+    const btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.textContent = 'copy';
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(String(val)).then(() => {
+        btn.textContent = 'copied';
+        setTimeout(() => (btn.textContent = 'copy'), 1200);
+      });
+    });
+    tdVal.appendChild(btn);
+  }
+
+  function render(config) {
+    const container = $('groups');
+    container.innerHTML = '';
+
+    const entries = Object.entries(config);
+    const used = new Set();
+
+    for (const g of GROUP_LABELS) {
+      const rows = entries.filter(([k]) => !used.has(k) && g.match(k));
+      if (!rows.length) continue;
+      rows.forEach(([k]) => used.add(k));
+
+      const title = document.createElement('div');
+      title.className = 'group-title';
+      title.textContent = g.label;
+      container.appendChild(title);
+      container.appendChild(buildTable(rows));
+    }
+
+    // Anything left over that didn't match a group
+    const leftover = entries.filter(([k]) => !used.has(k));
+    if (leftover.length) {
+      const title = document.createElement('div');
+      title.className = 'group-title';
+      title.textContent = 'Other';
+      container.appendChild(title);
+      container.appendChild(buildTable(leftover));
+    }
+  }
+
+  async function load() {
+    const btn = $('loadBtn');
+    const key = $('apiKey').value.trim();
+    const reveal = $('reveal').value.trim();
+
+    btn.disabled = true;
+    setStatus('loading…');
+
+    const url = reveal ? `${BASE}?reveal=${encodeURIComponent(reveal)}` : BASE;
+
+    try {
+      const res = await fetch(url, {
+        headers: key ? { 'X-API-Key': key } : {},
+      });
+      const body = await res.json().catch(() => null);
+
+      if (!body) {
+        throw new Error(`HTTP ${res.status} — not JSON`);
+      }
+      if (!res.ok || body.success === false) {
+        throw new Error(`HTTP ${res.status} — ${body.error || 'request failed'}`);
+      }
+      if (!body.config || typeof body.config !== 'object') {
+        const keys = Object.keys(body).join(', ') || '(none)';
+        throw new Error(`200 OK, but no "config" object. Body keys: ${keys}`);
+      }
+
+      // Warning banner (from server)
+      if (body.warning) {
+        const existing = document.querySelector('.warn');
+        if (existing) existing.innerHTML = `⚠️ <strong>Server warning:</strong> ${escHtml(body.warning)}`;
+      }
+
+      render(body.config);
+
+      const n = Object.keys(body.config).length;
+      setStatus(`ok · ${n} env var(s)`, 'ok');
+
+      $('raw').textContent = JSON.stringify(body, null, 2);
+    } catch (err) {
+      setStatus(`error: ${err.message}`, 'err');
+      $('groups').innerHTML = '';
+      $('raw').textContent = '';
+      console.error('[config viewer]', err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $('loadBtn').addEventListener('click', load);
+  $('apiKey').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') load();
+  });
+  $('reveal').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') load();
+  });
+})();
+</script>
+</body>
+</html>
