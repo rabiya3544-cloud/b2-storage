@@ -155,8 +155,18 @@ app.get('/play', async (c) => {
   return c.html(html);
 });
 
+app.get('/health', async (c) => {
+  const html = await readFile(join(process.cwd(), 'public/health.html'), 'utf-8');
+  return c.html(html);
+});
+
 app.get('/docs', async (c) => {
   const html = await readFile(join(process.cwd(), 'public/docs.html'), 'utf-8');
+  return c.html(html);
+});
+
+app.get('/account', async (c) => {
+  const html = await readFile(join(process.cwd(), 'public/account.html'), 'utf-8');
   return c.html(html);
 });
 
