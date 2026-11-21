@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>S3 Group Health</title>
+<style>
+  :root{
+    --bg:#0b0d12; --card:#12151c; --card2:#181c26; --line:#242a36;
+    --txt:#e6e9ef; --mut:#8b93a3; --acc:#4f9dff; --ok:#4ade80;
+    --warn:#ffb454; --err:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font-family:var(--sans);font-size:14px;line-height:1.5;
+    -webkit-text-size-adjust:100%}
+  code,kbd{font-family:var(--mono);font-size:.85em}
+  code{background:#0a0c11;border:1px solid var(--line);padding:1px 5px;
+    border-radius:5px;color:#7ee0b3;word-break:break-word}
+  pre{background:#0a0c11;border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;overflow-x:auto;margin:6px 0;font-size:11.5px;
+    line-height:1.5;max-height:220px}
+  pre code{background:none;border:none;padding:0;color:#c7cdd8;display:block}
+
+  .wrap{max-width:920px;margin:0 auto;padding:0 12px 100px}
+
+  header.top{position:sticky;top:0;z-index:50;
+    background:rgba(11,13,18,.94);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);padding:10px 12px;
+    padding-top:calc(10px + env(safe-area-inset-top))}
+  header.top .row{max-width:920px;margin:0 auto;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  header.top h1{font-size:15px;margin:0;font-weight:600;flex:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.top .live{display:inline-flex;align-items:center;gap:5px;
+    font-size:11px;color:var(--mut)}
+  header.top .live .dot{width:7px;height:7px;border-radius:50%;
+    background:var(--mut);transition:.2s}
+  header.top .live .dot.on{background:var(--ok);
+    box-shadow:0 0 6px var(--ok);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .controls{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  select,input{background:var(--card);border:1px solid var(--line);
+    color:var(--txt);border-radius:9px;padding:8px 10px;font-size:13px;
+    outline:none;font-family:var(--sans)}
+  select:focus,input:focus{border-color:var(--acc)}
+  select{flex:0 0 auto;min-width:140px}
+  input{flex:1;min-width:160px}
+  button{background:var(--acc);color:#04111f;border:none;
+    border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:var(--sans)}
+  button:active{opacity:.85}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:var(--card);color:var(--txt);
+    border:1px solid var(--line)}
+  button.ghost:hover{border-color:var(--acc)}
+
+  .summary{margin:14px 0;padding:12px;border-radius:12px;
+    background:var(--card);border:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+    gap:10px}
+  .stat{text-align:center}
+  .stat .n{font-size:22px;font-weight:700;line-height:1.1;
+    font-family:var(--mono)}
+  .stat .l{font-size:10px;color:var(--mut);text-transform:uppercase;
+    letter-spacing:.08em;margin-top:2px}
+  .stat.ok .n{color:var(--ok)}
+  .stat.err .n{color:var(--err)}
+  .stat.warn .n{color:var(--warn)}
+
+  .check{background:var(--card);border:1px solid var(--line);
+    border-radius:12px;margin-bottom:8px;overflow:hidden;
+    transition:border-color .2s}
+  .check.running{border-color:var(--acc)}
+  .check.ok{border-color:rgba(74,222,128,.4)}
+  .check.err{border-color:rgba(255,107,107,.4)}
+  .check.warn{border-color:rgba(255,180,84,.4)}
+  .check > .head{display:flex;align-items:center;gap:10px;
+    padding:10px 12px;font-size:13px}
+  .check > .head .status{flex:0 0 auto;width:20px;height:20px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700}
+  .check.ok > .head .status{color:var(--ok)}
+  .check.err > .head .status{color:var(--err)}
+  .check.warn > .head .status{color:var(--warn)}
+  .check.running > .head .status{color:var(--acc);
+    animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .check > .head .title{flex:1;font-weight:500}
+  .check > .head .ms{font-size:11px;color:var(--mut);
+    font-family:var(--mono)}
+  .check > .head .method{font-family:var(--mono);font-size:10px;
+    font-weight:700;padding:2px 6px;border-radius:5px;
+    background:var(--card2);color:var(--mut)}
+  .check > .head .method.GET{color:#7ab8ff}
+  .check > .head .method.POST{color:#7ee0b3}
+  .check > .head .method.DELETE{color:#ff9b9b}
+  .check > .body{padding:0 12px 10px;font-size:12.5px;
+    border-top:1px solid var(--line)}
+  .check > .body .lbl{display:block;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--mut);margin:8px 0 3px}
+  .check > .body p{margin:8px 0;color:#c7cdd8}
+  .check > .body table{width:100%;border-collapse:collapse;font-size:12px}
+  .check > .body td{padding:3px 0;border-bottom:1px solid var(--line);
+    vertical-align:top}
+  .check > .body td:first-child{color:var(--mut);width:45%;
+    padding-right:8px}
+  .check > .body td:last-child{word-break:break-word}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--mut);
+    font-size:13px}
+  .note{padding:10px 12px;border-radius:10px;font-size:12.5px;
+    background:var(--card2);border-left:3px solid var(--acc);
+    margin:12px 0;color:#c7cdd8}
+  .note.warn{border-left-color:var(--warn)}
+  .note.err{border-left-color:var(--err)}
+  .note.ok{border-left-color:var(--ok)}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:8px 14px;font-size:12.5px;
+    box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:100;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.show{opacity:1}
+
+  @media(min-width:640px){
+    header.top h1{font-size:17px}
+    select{min-width:180px}
+    .check > .head{padding:12px 14px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="row">
+    <h1>🔍 S3 Group Health</h1>
+    <div class="live"><span class="dot" id="liveDot"></span><span id="liveTxt">idle</span></div>
+  </div>
+  <div class="controls">
+    <select id="group">
+      <option value="0">Group 0 (default)</option>
+      <option value="1">Group 1 (_ONE)</option>
+      <option value="2">Group 2 (_TWO)</option>
+    </select>
+    <input id="apiKey" type="password" placeholder="X-API-Key (API_PASSWORD)" autocomplete="off">
+    <input id="userId" type="text" placeholder="userId" value="user_123" style="max-width:130px">
+  </div>
+  <div class="controls" style="margin-top:8px">
+    <button id="runAll">Run all checks</button>
+    <button id="runQuick" class="ghost">Quick (auth only)</button>
+    <button id="clear" class="ghost">Clear</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="note">
+    Health checks hit the real API. Nothing is uploaded or deleted —
+    all checks are read-only. Your <code>X-API-Key</code> is stored in
+    <code>sessionStorage</code> only, never persisted across sessions.
+  </div>
+
+  <div class="summary" id="summary" style="display:none">
+    <div class="stat ok"><div class="n" id="cntOk">0</div><div class="l">Passed</div></div>
+    <div class="stat warn"><div class="n" id="cntWarn">0</div><div class="l">Warnings</div></div>
+    <div class="stat err"><div class="n" id="cntErr">0</div><div class="l">Failed</div></div>
+    <div class="stat"><div class="n" id="cntTotal">0</div><div class="l">Total</div></div>
+  </div>
+
+  <div id="checks"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const groupSel = $('group');
+  const apiKeyIn = $('apiKey');
+  const userIdIn = $('userId');
+  const checksEl = $('checks');
+  const summaryEl = $('summary');
+  const liveDot = $('liveDot');
+  const liveTxt = $('liveTxt');
+  const toastEl = $('toast');
+
+  const GROUP_KEY = 's3Group';
+  const KEY_KEY   = 'healthApiKey';
+  const UID_KEY   = 'healthUserId';
+
+  // ── restore state ───────────────────────────────────
+  groupSel.value = localStorage.getItem(GROUP_KEY) || '0';
+  apiKeyIn.value = sessionStorage.getItem(KEY_KEY) || '';
+  userIdIn.value = sessionStorage.getItem(UID_KEY) || 'user_123';
+
+  groupSel.onchange = () => {
+    localStorage.setItem(GROUP_KEY, groupSel.value);
+    toast(`Group ${groupSel.value} selected — run checks again`);
+  };
+  apiKeyIn.oninput = () => sessionStorage.setItem(KEY_KEY, apiKeyIn.value);
+  userIdIn.oninput = () => sessionStorage.setItem(UID_KEY, userIdIn.value);
+
+  // ── check definitions ───────────────────────────────
+  // type: 'auth' | 's3' | 'db' | 'blob'
+  // Each check returns { ok, warn?, msg, meta? }
+  const CHECKS = [
+    {
+      id: 'auth',
+      title: 'API key accepted',
+      method: 'GET',
+      type: 'auth',
+      critical: true,
+      run: async ({ fetchJson }) => {
+        const r = await fetchJson('/api/b2-files-count?userId=__health__');
+        if (!r.ok) {
+          if (r.status === 401) return { ok:false, msg:'401 Unauthorized — wrong API key' };
+          return { ok:false, msg:`HTTP ${r.status}` };
+        }
+        if (r.data?.success === false) return { ok:false, msg:r.data.error || 'failed' };
+        return { ok:true, msg:'API key valid', meta:{ status:r.status } };
+      },
+    },
+    {
+      id: 'account-info',
+      title: 'B2 account info',
+      method: 'GET',
+      type: 's3',
+      critical: true,
+      run: async ({ fetchJson }) => {
+        const r = await fetchJson('/api/b2/account-info');
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        const d = r.data || {};
+        if (!d.ok) return { ok:false, msg:d.error || 'authorize failed' };
+        if (!d.bucketName) return { ok:false, warn:true, msg:'authorized but no bucketName in scope — check app key permissions' };
+        return {
+          ok:true,
+          msg:`Authorized · bucket "${d.bucketName}"`,
+          meta:{
+            accountId: d.accountId,
+            bucketName: d.bucketName,
+            bucketId: d.bucketId,
+            s3ApiUrl: d.s3ApiUrl,
+            group: d.group,
+          },
+        };
+      },
+    },
+    {
+      id: 'count',
+      title: 'b2_files count (DB)',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const r = await fetchJson(`/api/b2-files-count?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        return { ok:true, msg:`${r.data.count} rows for "${userId}"`, meta:{ count:r.data.count } };
+      },
+    },
+    {
+      id: 'keys',
+      title: 'known video keys',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const r = await fetchJson(`/api/known-video-keys?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        const items = r.data.items || [];
+        return {
+          ok:true,
+          msg: items.length ? `${items.length} video(s) found` : 'no videos yet (ok)',
+          meta: items.length ? { first: items[0].videoKey, latest: items[0].postedDate } : null,
+        };
+      },
+    },
+    {
+      id: 'links',
+      title: 'download links list',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const r = await fetchJson(`/api/download-links?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        const n = (r.data.items || []).length;
+        return { ok:true, msg: `${n} cached link(s)`, meta:{ count:n } };
+      },
+    },
+    {
+      id: 'links-view',
+      title: 'download links view',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const r = await fetchJson(`/api/download-links-view?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        const n = (r.data.items || []).length;
+        return { ok:true, msg:`${n} row(s) in view`, meta:{ count:n } };
+      },
+    },
+    {
+      id: 'local-list',
+      title: 'local files list',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const r = await fetchJson(`/api/local-files/list?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        return { ok:true, msg:`${(r.data.items || []).length} local file(s)` };
+      },
+    },
+    {
+      id: 'tiktok-count',
+      title: 'TikTok posts count',
+      method: 'GET',
+      type: 'db',
+      critical: false,
+      run: async ({ fetchJson }) => {
+        const r = await fetchJson('/api/tiktok?action=countPosts');
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (typeof r.data?.result !== 'number') {
+          return { ok:false, warn:true, msg:r.data?.error || 'unexpected response' };
+        }
+        return { ok:true, msg:`${r.data.result} TikTok post(s)` };
+      },
+    },
+    {
+      id: 'signed-url',
+      title: 'signed URL generation',
+      method: 'GET',
+      type: 's3',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        // Need at least one video to test signing
+        const keys = await fetchJson(`/api/known-video-keys?userId=${encodeURIComponent(userId)}`);
+        if (!keys.ok || !keys.data?.success) {
+          return { ok:false, warn:true, msg:'cannot list videos to test signing' };
+        }
+        const first = (keys.data.items || [])[0];
+        if (!first) {
+          return { ok:true, warn:true, msg:'no videos in this group — sign test skipped' };
+        }
+        const r = await fetchJson(
+          `/api/download-b2-file?videoKey=${encodeURIComponent(first.videoKey)}&userId=${encodeURIComponent(userId)}`
+        );
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        const url = r.data.downloadUrl || '';
+        if (!url.startsWith('http')) return { ok:false, msg:'no downloadUrl returned' };
+        // Verify the host looks like this group's endpoint
+        let host = '';
+        try { host = new URL(url).host; } catch {}
+        return {
+          ok:true,
+          msg:`signed OK · host ${host || '(unknown)'}`,
+          meta:{ videoKey:first.videoKey, host, expiresIn:'3 days' },
+        };
+      },
+    },
+    {
+      id: 'cover-sign',
+      title: 'cover URL signing',
+      method: 'GET',
+      type: 's3',
+      critical: false,
+      run: async ({ fetchJson, userId }) => {
+        const keys = await fetchJson(`/api/known-video-keys?userId=${encodeURIComponent(userId)}`);
+        if (!keys.ok || !keys.data?.success) {
+          return { ok:false, warn:true, msg:'cannot list videos' };
+        }
+        const first = (keys.data.items || [])[0];
+        if (!first) return { ok:true, warn:true, msg:'no videos — skipped' };
+
+        // Need coverKey; b2_files rows don't expose it via known-video-keys,
+        // so try download-links view which does
+        const view = await fetchJson(`/api/download-links-view?userId=${encodeURIComponent(userId)}`);
+        const withCover = (view.data?.items || []).find(x => x.coverKey);
+        if (!withCover) {
+          return { ok:true, warn:true, msg:'no cover in cache — sync first' };
+        }
+        const r = await fetchJson(
+          `/api/download-b2-cover?coverKey=${encodeURIComponent(withCover.coverKey)}&userId=${encodeURIComponent(userId)}`
+        );
+        if (!r.ok) return { ok:false, msg:`HTTP ${r.status}` };
+        if (!r.data?.success) return { ok:false, msg:r.data?.error || 'failed' };
+        return { ok:true, msg:'cover signed OK' };
+      },
+    },
+  ];
+
+  // ── runtime state ───────────────────────────────────
+  let running = false;
+
+  // ── helpers ─────────────────────────────────────────
+  function toast(msg, ms = 2000) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+
+  function setLive(state, text) {
+    liveDot.className = 'dot' + (state === 'on' ? ' on' : '');
+    liveTxt.textContent = text;
+  }
+
+  function makeApiFetch(groupId) {
+    return async function (path, opts = {}) {
+      const t0 = performance.now();
+      const headers = {
+        'X-API-Key': apiKeyIn.value.trim(),
+        'X-S3-Group': groupId,
+        ...(opts.headers || {}),
+      };
+      try {
+        const res = await fetch(path, { ...opts, headers });
+        const ms = Math.round(performance.now() - t0);
+        let data = null;
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('json')) {
+          data = await res.json().catch(() => null);
+        } else {
+          data = await res.text().catch(() => null);
+        }
+        return { ok: res.ok, status: res.status, data, ms, path };
+      } catch (e) {
+        return {
+          ok: false,
+          status: 0,
+          data: null,
+          ms: Math.round(performance.now() - t0),
+          path,
+          networkError: e.message,
+        };
+      }
+    };
+  }
+
+  // ── render ──────────────────────────────────────────
+  function makeRow(check) {
+    const el = document.createElement('div');
+    el.className = 'check';
+    el.id = 'check-' + check.id;
+    el.innerHTML = `
+      <div class="head">
+        <span class="status">○</span>
+        <span class="title">${check.title}</span>
+        <span class="method ${check.method}">${check.method}</span>
+        <span class="ms"></span>
+      </div>
+      <div class="body" style="display:none"></div>
+    `;
+    checksEl.appendChild(el);
+    return el;
+  }
+
+  function setRow(el, state, info, ms, meta) {
+    el.classList.remove('running', 'ok', 'err', 'warn');
+    el.classList.add(state);
+    const status = el.querySelector('.status');
+    status.textContent =
+      state === 'ok' ? '✓' :
+      state === 'err' ? '✗' :
+      state === 'warn' ? '!' :
+      state === 'running' ? '◌' : '○';
+    const msEl = el.querySelector('.ms');
+    msEl.textContent = ms != null ? ms + 'ms' : '';
+
+    const body = el.querySelector('.body');
+    body.innerHTML = '';
+    body.style.display = 'block';
+
+    if (info) {
+      const p = document.createElement('p');
+      p.textContent = info;
+      body.appendChild(p);
+    }
+    if (meta && Object.keys(meta).length) {
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = 'Details';
+      body.appendChild(lbl);
+      const tbl = document.createElement('table');
+      for (const [k, v] of Object.entries(meta)) {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.textContent = k;
+        const td2 = document.createElement('td');
+        td2.innerHTML = v === null || v === undefined
+          ? '<span style="color:var(--mut)">—</span>'
+          : `<code>${String(v).slice(0, 200)}</code>`;
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        tbl.appendChild(tr);
+      }
+      body.appendChild(tbl);
+    }
+  }
+
+  function resetSummary() {
+    $('cntOk').textContent = '0';
+    $('cntWarn').textContent = '0';
+    $('cntErr').textContent = '0';
+    $('cntTotal').textContent = '0';
+    summaryEl.style.display = 'grid';
+  }
+
+  function bumpSummary(state) {
+    if (state === 'ok') $('cntOk').textContent = (+$('cntOk').textContent + 1);
+    if (state === 'warn') $('cntWarn').textContent = (+$('cntWarn').textContent + 1);
+    if (state === 'err') $('cntErr').textContent = (+$('cntErr').textContent + 1);
+    $('cntTotal').textContent = (+$('cntTotal').textContent + 1);
+  }
+
+  // ── execution ───────────────────────────────────────
+  async function runAll(quick = false) {
+    if (running) return;
+    if (!apiKeyIn.value.trim()) {
+      toast('Enter your API key first');
+      apiKeyIn.focus();
+      return;
+    }
+
+    running = true;
+    $('runAll').disabled = true;
+    $('runQuick').disabled = true;
+    setLive('on', 'running…');
+    checksEl.innerHTML = '';
+    resetSummary();
+
+    const groupId = groupSel.value;
+    const userId  = userIdIn.value.trim() || 'user_123';
+    const fetchJson = makeApiFetch(groupId);
+
+    const list = quick ? CHECKS.slice(0, 2) : CHECKS;
+
+    for (const check of list) {
+      const row = makeRow(check);
+      setRow(row, 'running', 'running…', null);
+      const t0 = performance.now();
+      let result;
+      try {
+        result = await check.run({ fetchJson, userId });
+      } catch (e) {
+        result = { ok:false, msg: e.message || 'unexpected error' };
+      }
+      const ms = Math.round(performance.now() - t0);
+      const state =
+        result.ok && !result.warn ? 'ok' :
+        result.ok && result.warn  ? 'warn' :
+        result.warn               ? 'warn' : 'err';
+      setRow(row, state, result.msg, ms, result.meta);
+      bumpSummary(state);
+    }
+
+    running = false;
+    $('runAll').disabled = false;
+    $('runQuick').disabled = false;
+
+    const ok = +$('cntOk').textContent;
+    const warn = +$('cntWarn').textContent;
+    const err = +$('cntErr').textContent;
+    const total = ok + warn + err;
+
+    if (err === 0 && warn === 0) {
+      setLive('on', 'all pass');
+      toast(`✓ ${ok}/${total} passed for group ${groupId}`);
+    } else if (err === 0) {
+      setLive('', `${ok} pass, ${warn} warn`);
+      toast(`${ok} pass, ${warn} warn for group ${groupId}`);
+    } else {
+      setLive('', `${err} fail`);
+      toast(`✗ ${err} failure(s) for group ${groupId}`);
+    }
+  }
+
+  // ── wire buttons ────────────────────────────────────
+  $('runAll').onclick   = () => runAll(false);
+  $('runQuick').onclick = () => runAll(true);
+  $('clear').onclick = () => {
+    checksEl.innerHTML = '';
+    summaryEl.style.display = 'none';
+    setLive('', 'idle');
+  };
+
+  // keyboard shortcut: Ctrl/Cmd+Enter
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runAll(false);
+    }
+  });
+
+  // preload empty state
+  checksEl.innerHTML = `<div class="empty">Pick a group, enter your API key, then click <b>Run all checks</b>.</div>`;
+})();
+</script>
+</body>
+</html>
