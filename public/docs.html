@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>API Docs</title>
+<style>
+  :root{
+    --bg:#0b0d12; --card:#12151c; --card2:#181c26; --line:#242a36;
+    --txt:#e6e9ef; --mut:#8b93a3; --acc:#4f9dff; --acc2:#7ee0b3;
+    --warn:#ffb454; --err:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font-family:var(--sans);font-size:15px;line-height:1.5;
+    -webkit-text-size-adjust:100%}
+  a{color:var(--acc);text-decoration:none}
+  code,kbd{font-family:var(--mono);font-size:.85em}
+  code{background:#0a0c11;border:1px solid var(--line);
+    padding:1px 5px;border-radius:5px;color:var(--acc2);word-break:break-word}
+  pre{background:#0a0c11;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;overflow-x:auto;margin:8px 0;font-size:12px;
+    line-height:1.5;-webkit-overflow-scrolling:touch}
+  pre code{background:none;border:none;padding:0;color:var(--txt);display:block}
+
+  /* layout */
+  .wrap{max-width:820px;margin:0 auto;padding:0 14px 90px}
+  header.top{position:sticky;top:0;z-index:50;
+    background:rgba(11,13,18,.92);backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);padding:10px 14px;
+    padding-top:calc(10px + env(safe-area-inset-top))}
+  header.top .row{max-width:820px;margin:0 auto;
+    display:flex;align-items:center;gap:10px}
+  header.top h1{font-size:16px;margin:0;font-weight:600;flex:1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.top .badge{font-size:10px;color:var(--mut);
+    border:1px solid var(--line);border-radius:20px;padding:2px 8px;
+    white-space:nowrap}
+  .search{width:100%;margin-top:8px;position:relative}
+  .search input{width:100%;background:var(--card);border:1px solid var(--line);
+    color:var(--txt);border-radius:10px;padding:9px 34px 9px 12px;
+    font-size:14px;outline:none}
+  .search input:focus{border-color:var(--acc)}
+  .search::after{content:"⌕";position:absolute;right:12px;top:50%;
+    transform:translateY(-50%);color:var(--mut);pointer-events:none;font-size:16px}
+
+  /* tabs */
+  .tabs{position:sticky;top:calc(84px + env(safe-area-inset-top));z-index:40;
+    background:linear-gradient(var(--bg),var(--bg) 70%,transparent);
+    padding:8px 0;display:flex;gap:6px;overflow-x:auto;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;font-size:12px;padding:6px 11px;border-radius:20px;
+    border:1px solid var(--line);background:var(--card);color:var(--mut);
+    cursor:pointer;white-space:nowrap;transition:.15s}
+  .tab.active{background:var(--acc);color:#04111f;border-color:var(--acc);
+    font-weight:600}
+
+  /* sections */
+  section.cat{margin-top:20px}
+  section.cat > h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--mut);margin:0 0 10px;padding-left:4px}
+  details.ep{background:var(--card);border:1px solid var(--line);
+    border-radius:12px;margin-bottom:10px;overflow:hidden;
+    transition:border-color .15s}
+  details.ep[open]{border-color:#33405c}
+  details.ep > summary{list-style:none;cursor:pointer;
+    padding:12px 14px;display:flex;align-items:center;gap:10px;
+    font-size:14px;-webkit-user-select:none;user-select:none}
+  details.ep > summary::-webkit-details-marker{display:none}
+  .method{font-family:var(--mono);font-size:10px;font-weight:700;
+    padding:3px 7px;border-radius:6px;letter-spacing:.05em;
+    flex:0 0 auto;min-width:48px;text-align:center}
+  .GET   {background:rgba(79,157,255,.16);color:#7ab8ff}
+  .POST  {background:rgba(126,224,179,.16);color:var(--acc2)}
+  .DELETE{background:rgba(255,107,107,.16);color:#ff9b9b}
+  .path{font-family:var(--mono);font-size:12px;color:var(--txt);
+    flex:1;word-break:break-all;line-height:1.35}
+  .chev{color:var(--mut);transition:transform .2s;flex:0 0 auto}
+  details[open] .chev{transform:rotate(90deg)}
+  .body{padding:0 14px 14px;border-top:1px solid var(--line);
+    margin-top:0;font-size:14px}
+  .body p{margin:10px 0;color:#c7cdd8}
+  .body .lbl{display:block;font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--mut);margin:12px 0 4px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);
+    vertical-align:top}
+  th{color:var(--mut);font-weight:500;font-size:11px;
+    text-transform:uppercase;letter-spacing:.05em}
+  td code{font-size:12px}
+  .pill{display:inline-block;font-size:10px;padding:1px 6px;
+    border-radius:20px;background:var(--card2);color:var(--mut);
+    border:1px solid var(--line);margin-left:6px;vertical-align:middle}
+  .pill.req{background:rgba(255,180,84,.12);color:var(--warn);
+    border-color:rgba(255,180,84,.3)}
+  .pill.opt{background:rgba(139,147,163,.1);color:var(--mut)}
+  .note{background:var(--card2);border-left:3px solid var(--acc);
+    padding:8px 12px;border-radius:6px;font-size:13px;color:#c7cdd8;
+    margin:10px 0}
+  .note.warn{border-left-color:var(--warn)}
+  .auth{display:inline-flex;align-items:center;gap:5px;font-size:11px;
+    color:var(--warn);background:rgba(255,180,84,.08);
+    border:1px solid rgba(255,180,84,.25);padding:3px 8px;border-radius:20px}
+  .copy{float:right;background:var(--card2);border:1px solid var(--line);
+    color:var(--mut);font-size:11px;padding:3px 8px;border-radius:6px;
+    cursor:pointer;margin-top:-2px}
+  .copy:active{background:var(--acc);color:#04111f}
+  .hidden{display:none!important}
+  footer{color:var(--mut);font-size:12px;text-align:center;
+    padding:30px 0 10px;border-top:1px solid var(--line);margin-top:30px}
+
+  /* responsive */
+  @media(min-width:640px){
+    header.top h1{font-size:18px}
+    .search input{font-size:15px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="row">
+    <h1>📚 API Reference</h1>
+    <span class="badge" id="count">0 endpoints</span>
+  </div>
+  <div class="search"><input id="q" type="search" placeholder="Search endpoints…" autocomplete="off"></div>
+</header>
+
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-cat="all">All</button>
+    <button class="tab" data-cat="public">Public</button>
+    <button class="tab" data-cat="b2">B2</button>
+    <button class="tab" data-cat="video">Video</button>
+    <button class="tab" data-cat="links">Links</button>
+    <button class="tab" data-cat="tiktok">TikTok</button>
+    <button class="tab" data-cat="cover">Cover</button>
+    <button class="tab" data-cat="local">Local</button>
+  </div>
+
+  <div class="note warn" style="margin-top:10px">
+    All <code>/api/*</code> routes require the header
+    <code>X-API-Key: &lt;API_PASSWORD&gt;</code>.
+    Responses use <code>{ success: boolean, ... }</code> unless noted.
+  </div>
+
+  <!-- ============ PUBLIC ============ -->
+  <section class="cat" data-cat="public">
+    <h2>Public</h2>
+
+    <details class="ep" data-method="GET" data-path="/" data-keys="home index html">
+      <summary><span class="method GET">GET</span><span class="path">/</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Serves <code>public/index.html</code>. Falls back to plain text if missing.</p>
+        <span class="lbl">Response</span><pre><code>200 text/html</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/files" data-keys="files html">
+      <summary><span class="method GET">GET</span><span class="path">/files</span><span class="chev">›</span></summary>
+      <div class="body"><p>Serves <code>public/files.html</code>.</p></div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/play" data-keys="play html">
+      <summary><span class="method GET">GET</span><span class="path">/play</span><span class="chev">›</span></summary>
+      <div class="body"><p>Serves <code>public/play.html</code>.</p></div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/debug/files" data-keys="debug cwd fs">
+      <summary><span class="method GET">GET</span><span class="path">/debug/files</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Debug helper — lists working directory, root entries, and <code>public/</code> contents.</p>
+        <span class="lbl">Response</span>
+        <pre><code>{
+  "cwd": "/var/task",
+  "root": ["app.js","public","node_modules", …],
+  "public": ["index.html","files.html","play.html"]
+}</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ B2 ============ -->
+  <section class="cat" data-cat="b2">
+    <h2>B2 Account</h2>
+
+    <details class="ep" data-method="GET" data-path="/api/b2/account-info" data-keys="account info b2 auth capabilities">
+      <summary><span class="method GET">GET</span><span class="path">/api/b2/account-info</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Native Backblaze authorize-account. Returns only <em>public</em> account info — never the auth token.</p>
+        <span class="lbl">Response</span>
+        <pre><code>{
+  "ok": true,
+  "accountId": "…",
+  "apiUrl": "https://api…",
+  "downloadUrl": "https://…",
+  "s3ApiUrl": "https://…",
+  "capabilities": ["listBuckets","readFiles", …],
+  "bucketId": "…", "bucketName": "…", "namePrefix": "…",
+  "recommendedPartSize": 100000000,
+  "absoluteMinimumPartSize": 5000000
+}</code></pre>
+        <div class="note">Both flat and nested (<code>apiInfo.storageApi</code>) B2 shapes are normalized to one flat response.</div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ VIDEO ============ -->
+  <section class="cat" data-cat="video">
+    <h2>Video Upload &amp; Download</h2>
+
+    <details class="ep" data-method="POST" data-path="/api/upload-from-url" data-keys="upload video url tiktok cover likes user">
+      <summary><span class="method POST">POST</span><span class="path">/api/upload-from-url</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Server fetches a remote video from an allow-listed TikTok CDN host, streams it into B2, uploads an optional cover, and inserts a <code>b2_files</code> row. Failures are logged to <code>failed_uploads</code>.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Body (JSON)</span>
+        <table>
+          <tr><th>Field</th><th>Type</th><th></th></tr>
+          <tr><td><code>url</code></td><td>string</td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>coverImg</code></td><td>string</td><td><span class="pill opt">optional</span></td></tr>
+          <tr><td><code>userId</code></td><td>string</td><td><span class="pill opt">optional</span> (default <code>user_123</code>)</td></tr>
+          <tr><td><code>date</code></td><td>string</td><td><span class="pill opt">optional</span></td></tr>
+          <tr><td><code>likes</code></td><td>integer</td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">cURL</span>
+        <pre><button class="copy">Copy</button><code>curl -X POST $BASE/api/upload-from-url \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"url":"https://…tiktok…/v.mp4","userId":"u1","likes":42}'</code></pre>
+        <span class="lbl">Response (200)</span>
+        <pre><code>{ "success": true, "videoKey": "video_….mp4",
+  "coverKey": "cover_….jpg", "bytes": 12345678 }</code></pre>
+        <div class="note warn">Max file size <code>300 MB</code> · upstream timeout <code>90 s</code> · only allow-listed TikTok hosts.</div>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/download-b2-file" data-keys="download video signed url disposition">
+      <summary><span class="method GET">GET</span><span class="path">/api/download-b2-file</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Returns a signed B2 URL (expires in <b>3 days</b>) for a video the caller owns.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>videoKey</code></td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+          <tr><td><code>disposition</code></td><td><span class="pill opt">optional</span> <code>inline</code>|<code>attachment</code></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "downloadUrl": "https://…signed…" }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/download-b2-cover" data-keys="download cover signed url">
+      <summary><span class="method GET">GET</span><span class="path">/api/download-b2-cover</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Signed URL (3 days) for a cover owned by the user.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>coverKey</code></td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/known-video-keys" data-keys="list videos keys user">
+      <summary><span class="method GET">GET</span><span class="path">/api/known-video-keys</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Lists all <code>b2_files</code> rows for a user, newest first.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "items": [
+  { "videoKey": "video_…", "fileSize": 123, "postedDate": "2025-01-01" }
+]}</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/b2-files-count" data-keys="count rows b2 files user">
+      <summary><span class="method GET">GET</span><span class="path">/api/b2-files-count</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Row count of <code>b2_files</code>, optionally scoped to a user.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "count": 12, "userId": "u1" }</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ LINKS ============ -->
+  <section class="cat" data-cat="links">
+    <h2>Download Links Cache</h2>
+
+    <details class="ep" data-method="POST" data-path="/api/download-links/sync" data-keys="sync refresh signed urls cache stale 48">
+      <summary><span class="method POST">POST</span><span class="path">/api/download-links/sync</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Re-signs any video/cover URL that's missing or older than <b>48 hours</b> and upserts into <code>download_links</code>. Fresh rows are skipped.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Body (JSON)</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "added": 2, "refreshed": 5,
+  "skipped": 8, "total": 15, "staleHours": 48 }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/download-links" data-keys="list cached links">
+      <summary><span class="method GET">GET</span><span class="path">/api/download-links</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Lists cached links for a user.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "items": [{
+  "videoKey": "…", "userId": "u1", "coverKey": "…",
+  "videoUrl": "…", "coverUrl": "…", "fileSize": 123,
+  "createdAt": "2025-01-01 12:00:00"
+}]}</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="DELETE" data-path="/api/download-links" data-keys="delete link cache">
+      <summary><span class="method DELETE">DELETE</span><span class="path">/api/download-links</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Remove one cached link row.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>videoKey</code></td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/download-links-view" data-keys="view likes posted date download">
+      <summary><span class="method GET">GET</span><span class="path">/api/download-links-view</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Joined view: cached URLs + likes + posted_date. Sorted by <b>likes DESC</b>, then posted_date, then video_key.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "items": [{
+  "videoKey": "…", "videoUrl": "…", "coverUrl": "…",
+  "likes": 120, "postedDate": "2025-01-01",
+  "fileSize": 12345678, "createdAt": "…"
+}]}</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ TIKTOK ============ -->
+  <section class="cat" data-cat="tiktok">
+    <h2>TikTok Posts (RPC)</h2>
+
+    <details class="ep" data-method="POST" data-path="/api/tiktok" data-keys="insert post bulk update status blob cover dates">
+      <summary><span class="method POST">POST</span><span class="path">/api/tiktok</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>RPC entry point. Body is <code>{ "action": "…", "payload": {…} }</code>.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Actions</span>
+        <table>
+          <tr><th>action</th><th>payload</th></tr>
+          <tr><td><code>insertPost</code></td><td><code>{ post }</code></td></tr>
+          <tr><td><code>insertBulkPosts</code></td><td><code>{ posts: [...] }</code></td></tr>
+          <tr><td><code>updatePostsStatusByDates</code></td><td><code>{ dates: [...], status }</code></td></tr>
+          <tr><td><code>updateBlobCoverByDates</code></td><td><code>{ dates, blobCoverPathname, blobCoverUrl }</code></td></tr>
+        </table>
+        <span class="lbl">Example — insert post</span>
+        <pre><button class="copy">Copy</button><code>curl -X POST $BASE/api/tiktok \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"action":"insertPost","payload":{"post":{
+        "Date":"2025-01-01","Link":"https://…","Likes":"1,234",
+        "Title":"hello","Sound":"…","CoverImage":"https://…"
+      }}}'</code></pre>
+        <span class="lbl">Response (insertPost)</span>
+        <pre><code>{ "inserted": 1, "lastInsertRowid": "42" }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/tiktok" data-keys="summary top liked failed count debug clear">
+      <summary><span class="method GET">GET</span><span class="path">/api/tiktok</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Read/count actions via <code>?action=…</code>.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Actions</span>
+        <table>
+          <tr><th>action</th><th>Query</th><th>Returns</th></tr>
+          <tr><td><code>getPostsSummary</code></td><td><code>limit</code>,<code>offset</code></td><td>list (likes DESC)</td></tr>
+          <tr><td><code>getSummaryByDate</code></td><td><code>date</code></td><td>object|null</td></tr>
+          <tr><td><code>getTopLikedPosts</code></td><td><code>n</code></td><td>list</td></tr>
+          <tr><td><code>getFailedForB2</code></td><td><code>n</code></td><td>list from <code>failed_for_b2</code></td></tr>
+          <tr><td><code>countPosts</code></td><td>—</td><td>number</td></tr>
+          <tr><td><code>countSummaryRows</code></td><td>—</td><td>number</td></tr>
+          <tr><td><code>countPostsWithMinLikes</code></td><td><code>minLikes</code></td><td>number</td></tr>
+          <tr><td><code>debugViewCols</code></td><td>—</td><td>view columns + SQL</td></tr>
+          <tr><td><code>clearAllPosts</code></td><td>—</td><td><code>{ok,deleted}</code></td></tr>
+        </table>
+        <span class="lbl">Example</span>
+        <pre><code>curl "$BASE/api/tiktok?action=getTopLikedPosts&n=5" \
+  -H "X-API-Key: $KEY"</code></pre>
+        <span class="lbl">Response (countPosts)</span>
+        <pre><code>{ "result": 1234 }</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ COVER ============ -->
+  <section class="cat" data-cat="cover">
+    <h2>Cover Upload → Vercel Blob</h2>
+
+    <details class="ep" data-method="POST" data-path="/api/upload-cover-to-blob" data-keys="cover blob upload multipart json">
+      <summary><span class="method POST">POST</span><span class="path">/api/upload-cover-to-blob</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Two modes on the same URL:</p>
+        <ul style="margin:6px 0 6px 18px;padding:0;color:#c7cdd8;font-size:13px">
+          <li><b>multipart/form-data</b> — browser sends bytes directly (preferred)</li>
+          <li><b>application/json</b> — server fetches the image from an allow-listed TikTok CDN</li>
+        </ul>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Multipart fields</span>
+        <table>
+          <tr><td><code>file</code></td><td><span class="pill req">required</span> image, ≤10 MB</td></tr>
+          <tr><td><code>date</code>,<code>likes</code>,<code>userId</code>,<code>sourceLink</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">JSON fields</span>
+        <table>
+          <tr><td><code>coverImg</code></td><td><span class="pill req">required</span> URL</td></tr>
+          <tr><td><code>date</code>,<code>likes</code>,<code>userId</code>,<code>sourceLink</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true,
+  "pathname": "u1/cover_2025-01-01.jpg",
+  "url": "https://…public…",
+  "contentType": "image/jpeg",
+  "size": 45678 }</code></pre>
+        <div class="note">Blob path: <code>{userId}/cover_{date}.{ext}</code>. CORS-friendly, no auth needed to read <code>url</code>.</div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ LOCAL ============ -->
+  <section class="cat" data-cat="local">
+    <h2>Local Files</h2>
+
+    <details class="ep" data-method="POST" data-path="/api/local-files/upload" data-keys="local upload file multipart b2">
+      <summary><span class="method POST">POST</span><span class="path">/api/local-files/upload</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Multipart upload to B2 + insert into <code>local_files</code>.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Form fields</span>
+        <table>
+          <tr><td><code>file</code></td><td><span class="pill req">required</span> ≤300 MB</td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+          <tr><td><code>dateModified</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true,
+  "fileKey": "local_uuid.ext",
+  "originalName": "photo.jpg",
+  "fileType": "image/jpeg",
+  "fileSize": 12345,
+  "userId": "u1", "dateModified": "…" }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/local-files/list" data-keys="local list files">
+      <summary><span class="method GET">GET</span><span class="path">/api/local-files/list</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Lists all files for a user, newest first.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "items": [{
+  "fileKey": "…", "originalName": "…", "fileType": "…",
+  "fileSize": 123, "userId": "u1",
+  "dateModified": "…", "uploadedAt": "…"
+}]}</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="GET" data-path="/api/local-files/download" data-keys="local download signed url">
+      <summary><span class="method GET">GET</span><span class="path">/api/local-files/download</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Signed 3-day URL + metadata.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>fileKey</code></td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true, "downloadUrl": "…",
+  "fileKey": "…", "originalName": "…",
+  "fileType": "…", "fileSize": 123,
+  "expiresIn": 259200 }</code></pre>
+      </div>
+    </details>
+
+    <details class="ep" data-method="DELETE" data-path="/api/local-files/delete" data-keys="local delete file b2">
+      <summary><span class="method DELETE">DELETE</span><span class="path">/api/local-files/delete</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p>Deletes from B2 <b>and</b> the DB row.</p>
+        <span class="auth">🔒 X-API-Key</span>
+        <span class="lbl">Query</span>
+        <table>
+          <tr><td><code>fileKey</code></td><td><span class="pill req">required</span></td></tr>
+          <tr><td><code>userId</code></td><td><span class="pill opt">optional</span></td></tr>
+        </table>
+        <span class="lbl">Response</span>
+        <pre><code>{ "success": true }</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <footer>
+    Total endpoints: <span id="count2">0</span> ·
+    Use <code>?userId=</code> to scope data · Signed URLs expire in 3 days.
+  </footer>
+</div>
+
+<script>
+(function(){
+  const eps   = [...document.querySelectorAll('details.ep')];
+  const cats  = [...document.querySelectorAll('section.cat')];
+  const tabs  = [...document.querySelectorAll('.tab')];
+  const q     = document.getElementById('q');
+  const c1    = document.getElementById('count');
+  const c2    = document.getElementById('count2');
+  let activeTab = 'all';
+
+  c1.textContent = eps.length + ' endpoints';
+  c2.textContent = eps.length;
+
+  function applyFilters(){
+    const term = q.value.trim().toLowerCase();
+    let visible = 0;
+
+    cats.forEach(sec=>{
+      const catMatch = activeTab==='all' || sec.dataset.cat===activeTab;
+      let any = false;
+      [...sec.querySelectorAll('details.ep')].forEach(ep=>{
+        const textMatch = !term ||
+          (ep.dataset.path+' '+ep.dataset.method+' '+ep.dataset.keys+' '+ep.textContent)
+            .toLowerCase().includes(term);
+        const show = catMatch && textMatch;
+        ep.classList.toggle('hidden', !show);
+        if (show){ any = true; visible++; }
+      });
+      sec.classList.toggle('hidden', !any);
+    });
+
+    c2.textContent = visible;
+
+    // auto-open a single result
+    const shown = eps.filter(e=>!e.classList.contains('hidden'));
+    if (term && shown.length===1) shown[0].open = true;
+  }
+
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    activeTab = t.dataset.cat;
+    applyFilters();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }));
+
+  let tId;
+  q.addEventListener('input',()=>{
+    clearTimeout(tId);
+    tId = setTimeout(applyFilters, 120);
+  });
+
+  // copy buttons
+  document.addEventListener('click', async e=>{
+    const btn = e.target.closest('.copy');
+    if (!btn) return;
+    const pre = btn.parentElement;
+    const text = pre.querySelector('code')?.innerText || pre.innerText;
+    try {
+      await navigator.clipboard.writeText(text);
+      const old = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(()=>btn.textContent = old, 1200);
+    } catch {}
+  });
+
+  // auto-open hash-linked endpoint (#/path)
+  function openFromHash(){
+    if (!location.hash) return;
+    const path = decodeURIComponent(location.hash.slice(1));
+    const ep = eps.find(e=>e.dataset.path===path);
+    if (ep){ ep.open = true; ep.scrollIntoView({behavior:'smooth',block:'start'}); }
+  }
+  window.addEventListener('hashchange', openFromHash);
+  openFromHash();
+
+  applyFilters();
+})();
+</script>
+</body>
+</html>
