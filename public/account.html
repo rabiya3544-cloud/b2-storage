@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B2 Account Info</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 900px; }
+  h1 { margin-bottom: .25rem; }
+  .sub { color: #888; margin-top: 0; }
+  .card { border: 1px solid #8884; border-radius: 10px; padding: 1rem 1.25rem; margin-top: 1rem; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.25rem; margin: 0; }
+  dt { color: #888; }
+  dd { margin: 0; word-break: break-all; font-family: ui-monospace, monospace; font-size: 14px; }
+  .caps { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+  .caps span { background: #6366f120; border: 1px solid #6366f140; border-radius: 999px;
+               padding: .15rem .6rem; font-size: 13px; font-family: ui-monospace, monospace; }
+  .err { background: #ef444420; border: 1px solid #ef444450; padding: 1rem; border-radius: 10px; }
+  .hidden { display: none; }
+  input, button { font: inherit; padding: .45rem .7rem; border-radius: 8px; border: 1px solid #8886; }
+  button { cursor: pointer; background: #6366f1; color: #fff; border-color: transparent; }
+  button:disabled { opacity: .6; cursor: wait; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
+</style>
+</head>
+<body>
+<h1>Backblaze B2 account info</h1>
+<p class="sub">Calls <code>b2_authorize_account</code> server-side and shows what the key is allowed to do.</p>
+
+<div class="card">
+  <div class="row">
+    <input id="apiKey" type="password" placeholder="X-API-Key (API_PASSWORD)" style="flex:1;min-width:220px">
+    <button id="go">Fetch account info</button>
+  </div>
+  <p class="sub" style="margin:.5rem 0 0;font-size:13px">The key stays in this page; it's sent only to your own backend.</p>
+</div>
+
+<div id="status" class="card hidden"></div>
+<div id="result" class="card hidden">
+  <h2 style="margin-top:0;font-size:1.05rem">Account</h2>
+  <dl id="fields"></dl>
+  <h2 style="font-size:1.05rem;margin-bottom:.25rem">Capabilities</h2>
+  <div id="caps" class="caps"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (el) => el.classList.remove('hidden');
+const hide = (el) => el.classList.add('hidden');
+
+function render(data) {
+  const dl = $('fields');
+  dl.innerHTML = '';
+
+  const rows = [
+    ['Account ID',       data.accountId],
+    ['API URL',          data.apiUrl],
+    ['Download URL',     data.downloadUrl],
+    ['S3 API URL',       data.s3ApiUrl],
+    ['Bucket',           data.bucketName || (data.bucketId ? `(id: ${data.bucketId})` : 'account-wide (no bucket restriction)')],
+    ['Name prefix',      data.namePrefix || '—'],
+    ['Min part size',    data.absoluteMinimumPartSize ? `${Number(data.absoluteMinimumPartSize).toLocaleString()} bytes` : '—'],
+    ['Recommended part', data.recommendedPartSize ? `${Number(data.recommendedPartSize).toLocaleString()} bytes` : '—'],
+  ];
+
+  for (const [label, value] of rows) {
+    if (value === undefined || value === null || value === '') continue;
+    const dt = document.createElement('dt'); dt.textContent = label;
+    const dd = document.createElement('dd'); dd.textContent = String(value);
+    dl.append(dt, dd);
+  }
+
+  const caps = $('caps');
+  caps.innerHTML = '';
+  const list = data.capabilities || [];
+  if (!list.length) {
+    const s = document.createElement('span'); s.textContent = 'none returned'; caps.append(s);
+  } else {
+    for (const cap of list.sort()) {
+      const s = document.createElement('span'); s.textContent = cap; caps.append(s);
+    }
+  }
+}
+
+async function run() {
+  const key = $('apiKey').value.trim();
+  const btn = $('go');
+
+  hide($('result'));
+  show($('status'));
+  $('status').className = 'card';
+  $('status').textContent = 'Calling /api/b2/account-info …';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/b2/account-info', {
+      headers: key ? { 'X-API-Key': key } : {},
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      $('status').className = 'card err';
+      $('status').textContent = `Error (HTTP ${res.status}): ${data.error || 'unknown'}`;
+      return;
+    }
+
+    hide($('status'));
+    show($('result'));
+    render(data);
+  } catch (e) {
+    $('status').className = 'card err';
+    $('status').textContent = `Request failed: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('go').addEventListener('click', run);
+$('apiKey').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+</script>
+</body>
+</html>
