@@ -231,6 +231,11 @@ app.get('/account', async (c) => {
   return c.html(html);
 });
 
+app.get('/config', async (c) => {
+  const html = await readFile(join(process.cwd(), 'public/config.html'), 'utf-8');
+  return c.html(html);
+});
+
 app.get('/debug/files', async (c) => {
   const { readdir } = await import('fs/promises');
   try {
