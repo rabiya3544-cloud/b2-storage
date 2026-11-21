@@ -1,0 +1,8 @@
+{
+  "framework": "hono",
+  "functions": {
+    "src/app.js": {
+      "includeFiles": "public/**"
+    }
+  }
+}
