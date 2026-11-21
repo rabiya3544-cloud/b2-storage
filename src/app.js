@@ -81,6 +81,67 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
+app.get('/api/config', async (c) => {
+  const pick = (name) => process.env[name] ?? null;
+  const redact = (name) => (process.env[name] ? '***set***' : null);
+
+  const endpointInfo = (urlStr) => {
+    if (!urlStr) return { endpointUrl: null, region: null, host: null };
+    try {
+      const u = new URL(urlStr);
+      return {
+        endpointUrl: urlStr,
+        region: u.hostname.split('.')[1] || null,
+        host: u.hostname,
+      };
+    } catch {
+      return { endpointUrl: urlStr, region: null, host: null };
+    }
+  };
+
+  const group = (suffix) => {
+    const ep = pick(`B2_ENDPOINT_URL${suffix}`);
+    const info = endpointInfo(ep);
+    return {
+      [`B2_ENDPOINT_URL${suffix}`]:        info.endpointUrl,
+      [`B2_REGION${suffix}`]:              info.region,
+      [`B2_HOST${suffix}`]:                info.host,
+      [`B2_BUCKET_NAME${suffix}`]:         pick(`B2_BUCKET_NAME${suffix}`),
+      [`B2_APPLICATION_KEY_ID${suffix}`]:  pick(`B2_APPLICATION_KEY_ID${suffix}`),
+      [`B2_APPLICATION_KEY${suffix}`]:     redact(`B2_APPLICATION_KEY${suffix}`),
+    };
+  };
+
+  let tursoHost = null;
+  try {
+    tursoHost = new URL(process.env.TURSO_DATABASE_URL).host;
+  } catch {}
+
+  return c.json({
+    success: true,
+    warning: 'DEBUG CONFIG — reveals B2 key IDs + buckets. API keys are redacted. Remove + rotate after debugging.',
+
+    config: {
+      // ── Group 0 (default) ──────────────────────────
+      ...group(''),
+
+      // ── Group 1 ────────────────────────────────────
+      ...group('_ONE'),
+
+      // ── Group 2 ────────────────────────────────────
+      ...group('_TWO'),
+
+      // ── Turso ──────────────────────────────────────
+      TURSO_DATABASE_URL_HOST: tursoHost,
+      TURSO_AUTH_TOKEN:        redact('TURSO_AUTH_TOKEN'),
+
+      // ── Deployment ─────────────────────────────────
+      VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
+      VERCEL_ENV:            process.env.VERCEL_ENV || null,
+      NODE_ENV:              process.env.NODE_ENV || null,
+    },
+  });
+});
 // ── Backblaze B2 account info ─────────────────────────────
 // Calls the native b2_authorize_account endpoint and returns
 // only the account info (never the authorizationToken).
