@@ -976,6 +976,10 @@ app.get('/api/tiktok', async (c) => {
         const n = clamp(Number(c.req.query('n') ?? 10), 1, 3000);
         return c.json({ result: await tiktokGetTopLikedPosts(n) });
       }
+        case 'getTopFiledPosts': {
+        const n = clamp(Number(c.req.query('n') ?? 10), 1, 3000);
+        return c.json({ result: await tiktokGetFailedPosts(n) });
+      }
       case 'getFailedForB2': {
         const n = clamp(Number(c.req.query('n') ?? 100), 1, 3000);
         return c.json({ result: await tiktokGetFailedForB2(n) });
