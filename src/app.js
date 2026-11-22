@@ -253,7 +253,7 @@ app.get('/debug/files', async (c) => {
   }
 });
 const ALLOWED_HOSTS = /(^|\.)(tiktokv|tiktokcdn|byteoversea|ibytedtos|muscdn|tos-)\.com$/i;
-const MAX_BYTES = 300 * 1024 * 1024;
+const MAX_BYTES = 350 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 90_000;
 
 async function uploadImageFromUrl(client, imageUrl) {
