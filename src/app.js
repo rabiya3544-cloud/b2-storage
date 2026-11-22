@@ -528,11 +528,9 @@ app.post('/api/download-links/sync', async (c) => {
     const resolvedUserId = String(userId || 'user_123').trim().slice(0, 100) || 'user_123';
 
     // All videos the user owns in b2_files
-    const allVideos = await db.execute({
-      sql: `SELECT video_key, cover_key, file_size
-            FROM b2_files WHERE user_id = ?`,
-      args: [resolvedUserId],
-    });
+        // const allVideos = await db.execute({sql: `SELECT video_key, cover_key, file_size FROM b2_files WHERE user_id = ?`, args: [resolvedUserId],});
+    
+    const allVideos = await db.execute({sql: `SELECT video_key, cover_key, file_size FROM b2_files WHERE user_id = ? AND b2_group = ?`, args: [resolvedUserId, 1],});
 
     // Rows in download_links that are still fresh (created within STALE_HOURS)
     const fresh = await db.execute({
