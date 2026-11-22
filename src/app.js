@@ -853,7 +853,15 @@ async function tiktokGetTopLikedPosts(n = 10) {
   });
   return rowsToObjects(r);
 }
-
+async function tiktokGetFailedPosts(n = 10) {
+  const r = await turso().execute({
+    sql: `SELECT "Date", "Likes", "CoverImage", "Link", "Status",
+                 "blob_cover_pathname", "blob_cover_url"
+          FROM all_failed ORDER BY "Likes" DESC LIMIT ?`,
+    args: [n],
+  });
+  return rowsToObjects(r);
+}
 async function tiktokGetFailedForB2(n = 100) {
   const r = await turso().execute({
     sql: `SELECT "Date", "Likes", "CoverImage", "Link", "Status",
