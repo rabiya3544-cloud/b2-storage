@@ -8,9 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <style>
-        /* ============================================================
-           BRAND TOKENS (from user's app.css)
-           ============================================================ */
         :root {
             --bg-0: #061214;
             --bg-1: #0a1f24;
@@ -63,7 +60,6 @@
             overflow: hidden;
         }
 
-        /* ---- header / top bar ---- */
         .top-bar {
             flex-shrink: 0;
             padding: 4px 8px;
@@ -111,7 +107,6 @@
             background: var(--bg-2);
         }
 
-        /* ---- profile block ---- */
         .profile-block {
             flex-shrink: 0;
             display: flex;
@@ -205,7 +200,6 @@
             font-weight: 700;
         }
 
-        /* ---- tab bar (icons only) ---- */
         .tab-bar {
             flex-shrink: 0;
             display: flex;
@@ -252,7 +246,6 @@
             border-radius: 1px;
         }
 
-        /* ---- tab panels — these scroll ---- */
         .tab-panels {
             flex: 1;
             min-height: 0;
@@ -283,9 +276,6 @@
             border-radius: 2px;
         }
 
-        /* ============================================================
-           VIDEO GRID — byte-identical to verified original
-           ============================================================ */
         .grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -358,7 +348,6 @@
             text-shadow: 0 0 6px var(--teal-glow);
         }
 
-        /* ---- bottom nav ---- */
         .bottom-nav {
             flex-shrink: 0;
             display: flex;
@@ -385,6 +374,7 @@
             border-radius: 30px;
             font-family: inherit;
             cursor: pointer;
+            text-decoration: none;
         }
 
         .nav-item.active {
@@ -421,7 +411,6 @@
             transform: scale(0.92);
         }
 
-        /* brand-tinted gradient backgrounds */
         .bg-1  { background: linear-gradient(145deg, #0a1f24, #0fb39a, #14f0c8); }
         .bg-2  { background: linear-gradient(145deg, #061214, #123840, #0fb39a); }
         .bg-3  { background: linear-gradient(145deg, #0e2a30, #14f0c8, #0a1f24); }
@@ -494,9 +483,6 @@ height:100%!important;
 }
 </style>
 <style>
-/* ============================================================
-   FULL-PAGE VIDEO PLAYER OVERLAY
-   ============================================================ */
 .player-overlay {
   position: absolute;
   inset: 0;
@@ -505,7 +491,6 @@ height:100%!important;
   display: none;
   flex-direction: column;
   overflow: hidden;
-  /* respect iOS safe areas */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -514,7 +499,6 @@ height:100%!important;
   display: flex;
 }
 
-/* ---- video stage ---- */
 .player-stage {
   flex: 1;
   min-height: 0;
@@ -529,12 +513,11 @@ height:100%!important;
 .player-stage video {
   width: 100%;
   height: 100%;
-  object-fit: contain;            /* full video, no crop */
+  object-fit: contain;
   background: #000;
   outline: none;
 }
 
-/* subtle brand glow frame around the video */
 .player-stage::after {
   content: "";
   position: absolute;
@@ -543,7 +526,6 @@ height:100%!important;
   box-shadow: inset 0 0 120px rgba(20, 240, 200, 0.06);
 }
 
-/* ---- top gradient bar (close + title) ---- */
 .player-top {
   position: absolute;
   top: 0;
@@ -591,7 +573,6 @@ height:100%!important;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
 }
 
-/* ---- right-side action rail (TikTok style) ---- */
 .player-rail {
   position: absolute;
   right: 10px;
@@ -635,7 +616,6 @@ height:100%!important;
   color: var(--text);
 }
 
-/* ---- bottom meta (author + caption) ---- */
 .player-meta {
   position: absolute;
   left: 12px;
@@ -666,7 +646,6 @@ height:100%!important;
   overflow: hidden;
 }
 
-/* ---- center tap-to-pause indicator ---- */
 .player-pause-ind {
   position: absolute;
   inset: 0;
@@ -687,7 +666,6 @@ height:100%!important;
   text-shadow: 0 0 30px var(--teal-glow);
 }
 
-/* ---- loading spinner ---- */
 .player-loading {
   position: absolute;
   inset: 0;
@@ -710,10 +688,9 @@ height:100%!important;
   to { transform: rotate(360deg); }
 }
 
-/* grid items get a hover hint of playability */
 .grid-item { cursor: pointer; }
 .grid-item::before {
-  content: "\f04b";  /* fa-play */
+  content: "\f04b";
   font-family: "Font Awesome 6 Free";
   font-weight: 900;
   position: absolute;
@@ -732,7 +709,6 @@ height:100%!important;
  font-size: 26px;
 }
 
-/* lock scroll on body when player open */
 body.player-open { overflow: hidden; }
 [hidden]{
 display: none!important;
@@ -748,7 +724,6 @@ display: none!important;
             </button>
         </header>
 
-        <!-- Profile block -->
 <section class="profile-block">
 <div class="avatar">
 <img src="IMG_7379.png" alt="">
@@ -776,7 +751,6 @@ display: none!important;
 </div>
 </section>
 
-        <!-- Tab bar — icons only -->
         <nav class="tab-bar" role="tablist">
             <button class="tab-btn active" data-tab="posts" role="tab" aria-selected="true" aria-label="Posts">
                 <i class="fa-solid fa-table-cells"></i>
@@ -795,15 +769,12 @@ display: none!important;
             </button>
         </nav>
 
-        <!-- Tab panels -->
         <div class="tab-panels">
 
-            <!-- POSTS -->
             <section class="tab-panel active" id="panel-posts" role="tabpanel">
 <div id="linksGrid" class="grid"></div>
             </section>
 
-            <!-- PRIVATE -->
 <section class="tab-panel" id="panel-private" role="tabpanel">
 <div id="playerOverlay" class="player-overlay active" role="dialog" aria-modal="true" aria-hidden="false">
 <div class="player-stage">
@@ -842,17 +813,14 @@ display: none!important;
 
 </section>
 
-            <!-- REPOSTS -->
             <section class="tab-panel" id="panel-reposts" role="tabpanel">
 <div class="grid"></div>
             </section>
 
-            <!-- FAVORITES -->
             <section class="tab-panel" id="panel-favorites" role="tabpanel">
 <div class="grid"></div>
             </section>
 
-            <!-- LIKED -->
             <section class="tab-panel" id="panel-liked" role="tabpanel">
 <div class="grid"></div>
             </section>
@@ -998,7 +966,6 @@ function filterByLikes(arr, threshold = 50, key = 'likes') {
 function shuffles(arr) {
 if (!Array.isArray(arr)) throw new TypeError('shuffle: expected an array');
 const out = arr.slice();
-// don't mutate the input
 for (let i = out.length - 1; i > 0; i--) {
 const j = Math.floor(Math.random() * (i + 1));
 [out[i], out[j]] = [out[j], out[i]];
@@ -1006,9 +973,6 @@ const j = Math.floor(Math.random() * (i + 1));
 return out;
 }
 
-    // ============================================================
-    // RENDER
-    // ============================================================
     function renderGrids(items, target) {
     const grid = target || els.linksGrid;
     if (!grid) return;
@@ -1017,7 +981,6 @@ return out;
         grid.innerHTML = '';
         return;
     }
-    // console.log(items[0]);
     const filtered = filterByLikes(items, 50, 'likes');
     const randomized = shuffles(filtered);
     grid.innerHTML = randomized.map((item, i) => {
@@ -1045,9 +1008,6 @@ return out;
         }).join('');
     }
 
-    // ============================================================
-    // API CALLS
-    // ============================================================
     async function load() {
         if (els.linksLoadBtn) els.linksLoadBtn.disabled = true;
         try {
@@ -1227,7 +1187,8 @@ init();
         }
 
         // ============================================================
-        // DOWNLOAD — via server proxy
+        // DOWNLOAD — signed attachment URL + browser navigation.
+        // Server signs; browser goes direct to B2. Full size, no proxy.
         // ============================================================
         async function downloadCurrent() {
             if (!currentItem) return;
@@ -1244,30 +1205,28 @@ init();
             if (icon) icon.className = 'fa-solid fa-circle-notch fa-spin';
 
             try {
+                const apiKey = localStorage.getItem('xapiKey') || '';
                 const params = new URLSearchParams({
                     videoKey: key,
                     userId: CONFIG.DEFAULT_USER,
+                    disposition: 'attachment',
                 });
-                const apiKey = localStorage.getItem('xapiKey') || '';
                 const res = await fetch(
-                    CONFIG.API_BASE + '/api/download-b2-proxy?' + params.toString(),
+                    CONFIG.API_BASE + '/api/download-b2-file?' + params.toString(),
                     { headers: apiKey ? { 'X-API-Key': apiKey } : {} }
                 );
-
-                if (!res.ok) {
-                    const errBody = await res.json().catch(() => ({}));
-                    throw new Error(errBody.error || ('HTTP ' + res.status));
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success || !data.downloadUrl) {
+                    throw new Error(data.error || ('HTTP ' + res.status));
                 }
 
-                const blob = await res.blob();
-                const objUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = objUrl;
+                a.href = data.downloadUrl;
                 a.download = key;
+                a.rel = 'noopener';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-                setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
 
                 flashDownloadFeedback(true);
             } catch (err) {
@@ -1369,7 +1328,7 @@ init();
                 open({
                     videoUrl: src,
                     videoKey: videoKey,
-                    likes: tile.getAttribute('data-likes') || 0,
+                    likes: tile.getAttribute('data-likes') || '0',
                     datePosted: datePosted,
                 });
             });
