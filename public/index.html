@@ -982,8 +982,8 @@ return out;
         return;
     }
     const filtered = filterByLikes(items, 50, 'likes');
-    const randomized = shuffles(filtered);
-    grid.innerHTML = randomized.map((item, i) => {
+    // const randomized = shuffles(filtered);
+    grid.innerHTML = filtered.map((item, i) => {
             const cover = escHtml(item.coverUrl || '');
             const video = escHtml(item.videoUrl || '');
             const likes = Number(item.likes || 0).toLocaleString();
