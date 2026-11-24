@@ -218,311 +218,7 @@
     </form>
   </div>
 </div>
-<!--
-<script>
-// ============================================================
-// 02-downloadUrlFromB2.js — standalone Download Links page.
-// Mirror of app.js Module 9 (Links) + Module 2 (Auth), scoped to one page.
-// ============================================================
-(function (global) {
-  'use strict';
-  if (global.AppDownloadLinks) { return; }
 
-  // ============================================================
-  // CONFIG
-  // ============================================================
-  const CONFIG = Object.freeze({
-    API_BASE: 'https://b2-storage-kappa.vercel.app',
-    DEFAULT_USER: 'jafernegery',
-    LS_API_KEY: 'xapiKey',
-  });
-
-  // ============================================================
-  // DOM
-  // ============================================================
-  const $ = (id) => document.getElementById(id);
-  const els = {
-    linksTbody:   $('links-tbody'),
-    linksLog:     $('linksLog'),
-    linksStatus:  $('linksStatus'),
-    linksSyncBtn: $('linksSyncBtn'),
-    linksLoadBtn: $('linksLoadBtn'),
-    linksUserId:  $('linksUserId'),
-    authOverlay:  $('authOverlay'),
-    authForm:     $('authForm'),
-    authPassword: $('authPassword'),
-    authError:    $('authError'),
-  };
-
-  // ============================================================
-  // HELPERS
-  // ============================================================
-  const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]));
-
-  const fmtBytes = (b) => {
-    if (!b || b < 0) return '—';
-    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB';
-    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' MB';
-    if (b >= 1024)       return Math.round(b / 1024) + ' KB';
-    return b + ' B';
-  };
-
-  const setStatus = (text, cls) => {
-    if (!els.linksStatus) return;
-    els.linksStatus.textContent = text;
-    els.linksStatus.className = `status ${cls || ''}`;
-  };
-
-  const log = (msg, kind = 'info') => {
-    if (!els.linksLog) return;
-    const line = document.createElement('span');
-    line.className = `line ${kind}`;
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    els.linksLog.appendChild(line);
-    els.linksLog.scrollTop = els.linksLog.scrollHeight;
-  };
-
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (e) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand('copy');
-      ta.remove();
-      return ok;
-    }
-  }
-
-  // ============================================================
-  // AUTH
-  // ============================================================
-  let apiKey = localStorage.getItem(CONFIG.LS_API_KEY) || '';
-
-  function showAuthOverlay(msg) {
-    if (!els.authOverlay) return;
-    if (els.authError) els.authError.textContent = msg || '';
-    els.authOverlay.classList.add('active');
-    setTimeout(() => els.authPassword && els.authPassword.focus(), 50);
-  }
-  function hideAuthOverlay() {
-    if (els.authOverlay) els.authOverlay.classList.remove('active');
-  }
-  function setApiKey(val) {
-    apiKey = val;
-    localStorage.setItem(CONFIG.LS_API_KEY, val);
-  }
-  function getApiKey() { return apiKey; }
-
-  function initAuth() {
-    if (els.authForm) {
-      els.authForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const val = els.authPassword ? els.authPassword.value : '';
-        if (!val) return;
-        setApiKey(val);
-        hideAuthOverlay();
-        if (els.authPassword) els.authPassword.value = '';
-        if (els.authError) els.authError.textContent = '';
-      });
-    }
-    if (!apiKey) showAuthOverlay('');
-  }
-
-  // ============================================================
-  // HTTP — attaches X-API-Key ONLY to CONFIG.API_BASE
-  // ============================================================
-  async function http(input, init = {}) {
-    const url = typeof input === 'string' ? input : (input && input.url) || '';
-    const needsAuth =
-      url === CONFIG.API_BASE || url.indexOf(CONFIG.API_BASE + '/') === 0;
-
-    let nextInit = init;
-    if (needsAuth && getApiKey()) {
-      nextInit = Object.assign({}, init, {
-        headers: Object.assign({}, init.headers || {}, {
-          'X-API-Key': getApiKey(),
-        }),
-      });
-    }
-
-    const res = await fetch(input, nextInit);
-    if (res.status === 401) {
-      showAuthOverlay('Wrong password. Try again.');
-    }
-    return res;
-  }
-
-  // ============================================================
-  // RENDER — 6 columns: #, cover, size, likes, posted, actions
-  // (Video key removed from view; still in data-key for Delete)
-  // ============================================================
-  function renderRows(items) {
-    if (!els.linksTbody) return;
-    if (!items || items.length === 0) {
-      els.linksTbody.innerHTML = '<tr><td colspan="6" class="row-empty">No links.</td></tr>';
-      return;
-    }
-
-    els.linksTbody.innerHTML = items.map((it, i) => `
-      <tr
-        data-key="${escHtml(it.videoKey)}"
-        data-video-url="${escHtml(it.videoUrl || '')}"
-        data-cover-url="${escHtml(it.coverUrl || '')}"
-      >
-        <td class="col-sno">${i + 1}</td>
-        <td class="col-cover">
-          ${it.coverUrl
-            ? `<img src="${escHtml(it.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-            : `<div class="no-cover"></div>`}
-        </td>
-        <td class="col-date hide-sm">${fmtBytes(it.fileSize)}</td>
-        <td class="col-likes hide-sm">${Number(it.likes || 0).toLocaleString()}</td>
-        <td class="col-date hide-sm">${escHtml((it.postedDate || '').slice(0, 10))}</td>
-        <td class="col-actions">
-          <button class="action-btn" data-role="copy-video">Copy Video</button>
-          <button class="action-btn" data-role="copy-cover" ${it.coverUrl ? '' : 'disabled'}>Copy Cover</button>
-          <button class="action-btn danger" data-role="delete">Delete</button>
-        </td>
-      </tr>
-    `).join('');
-
-    els.linksTbody.querySelectorAll('button[data-role="copy-video"]').forEach((b) => {
-      b.addEventListener('click', async () => {
-        const url = b.closest('tr').getAttribute('data-video-url');
-        if (!url) { log('No video URL.', 'err'); return; }
-        const ok = await copyText(url);
-        log(ok ? 'Video URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
-      });
-    });
-
-    els.linksTbody.querySelectorAll('button[data-role="copy-cover"]').forEach((b) => {
-      b.addEventListener('click', async () => {
-        const url = b.closest('tr').getAttribute('data-cover-url');
-        if (!url) { log('No cover URL.', 'err'); return; }
-        const ok = await copyText(url);
-        log(ok ? 'Cover URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
-      });
-    });
-
-    els.linksTbody.querySelectorAll('button[data-role="delete"]').forEach((b) => {
-      b.addEventListener('click', async () => {
-        const tr  = b.closest('tr');
-        const key = tr.getAttribute('data-key');
-        if (!global.confirm(`Delete row for ${key}?`)) return;
-
-        try {
-          const params = new URLSearchParams({ videoKey: key });
-          const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
-          if (userId) params.set('userId', userId);
-
-          const res  = await http(`${CONFIG.API_BASE}/api/download-links?${params}`, { method: 'DELETE' });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-
-          tr.remove();
-          log(`Deleted: ${key}`, 'ok');
-        } catch (err) {
-          log(`Delete failed: ${err.message}`, 'err');
-        }
-      });
-    });
-  }
-
-  // ============================================================
-  // API CALLS
-  // ============================================================
-  async function load() {
-    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
-    if (els.linksLoadBtn) els.linksLoadBtn.disabled = true;
-    setStatus('Loading', 'busy');
-    log(`GET ${CONFIG.API_BASE}/api/download-links-view?userId=${userId || '(default)'}`, 'info');
-
-    try {
-      const params = new URLSearchParams();
-      if (userId) params.set('userId', userId);
-
-      const res  = await http(`${CONFIG.API_BASE}/api/download-links-view?${params}`);
-      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
-      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-
-      renderRows(data.items || []);
-      const n = data.items ? data.items.length : 0;
-      setStatus(`Loaded ${n}`, 'done');
-      log(`Loaded ${n} row(s).`, 'ok');
-    } catch (err) {
-      if (els.linksTbody) {
-        els.linksTbody.innerHTML = `<tr><td colspan="6" class="row-error">Failed: ${escHtml(err.message)}</td></tr>`;
-      }
-      setStatus('Failed', 'failed');
-      log(`Failed: ${err.message}`, 'err');
-    } finally {
-      if (els.linksLoadBtn) els.linksLoadBtn.disabled = false;
-    }
-  }
-
-  async function sync() {
-    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
-    if (els.linksSyncBtn) els.linksSyncBtn.disabled = true;
-    setStatus('Syncing', 'busy');
-    log(`POST ${CONFIG.API_BASE}/api/download-links/sync`, 'info');
-
-    try {
-      const res  = await http(`${CONFIG.API_BASE}/api/download-links/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userId || undefined }),
-      });
-      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
-      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-
-      log(`Added: ${data.added} · Refreshed: ${data.refreshed} · Skipped: ${data.skipped}`, 'ok');
-      setStatus(`+${data.added} ↻${data.refreshed}`, 'done');
-      await load();
-    } catch (err) {
-      setStatus('Failed', 'failed');
-      log(`Sync failed: ${err.message}`, 'err');
-    } finally {
-      if (els.linksSyncBtn) els.linksSyncBtn.disabled = false;
-    }
-  }
-
-  // ============================================================
-  // WIRING
-  // ============================================================
-  function init() {
-    if (els.linksLoadBtn) els.linksLoadBtn.addEventListener('click', load);
-    if (els.linksSyncBtn) els.linksSyncBtn.addEventListener('click', sync);
-    initAuth();
-  }
-
-  // ============================================================
-  // EXPORT + BOOT
-  // ============================================================
-  global.AppDownloadLinks = Object.freeze({
-    init,
-    load,
-    sync,
-    showAuthOverlay,
-    hideAuthOverlay,
-    getApiKey,
-  });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})(window);
-</script>
--->
 <script>
 // ============================================================
 // 02-downloadUrlFromB2.js — standalone Download Links page.
@@ -608,18 +304,19 @@
       return ok;
     }
   }
-  
+
   async function fetchAttachmentUrl(videoKey, userId) {
-  const params = new URLSearchParams({
-    videoKey,
-    userId: userId || CONFIG.DEFAULT_USER,
-    disposition: 'attachment',
-  });
-  const res = await http(`${CONFIG.API_BASE}/api/download-b2-file?${params}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
-  return data.downloadUrl;
-}
+    const params = new URLSearchParams({
+      videoKey,
+      userId: userId || CONFIG.DEFAULT_USER,
+      disposition: 'attachment',
+    });
+    const res = await http(`${CONFIG.API_BASE}/api/download-b2-file?${params}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+    return data.downloadUrl;
+  }
+
   // ============================================================
   // LOADING OVERLAY + BUSY-BUTTON HELPERS
   // ============================================================
@@ -720,29 +417,54 @@
   }
 
   // ============================================================
+  // DOWNLOAD — Tok Player pattern:
+  //   1) ask server for a fresh signed URL (disposition=attachment)
+  //   2) fetch bytes into a Blob (with CORS)
+  //   3) save via blob: URL + <a download>
+  //   4) if step 2 fails (CORS etc.), fall back to old <a href> behavior
+  // ============================================================
+  async function downloadVideo(videoKey, userId) {
+    const downloadUrl = await fetchAttachmentUrl(videoKey, userId);
+
+    // Try the Blob path first — this is what makes mobile save the file.
+    let blob = null;
+    try {
+      const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      blob = await res.blob();
+    } catch (err) {
+      // Blob path failed (likely CORS). Fall back to old behavior so the
+      // button still does something useful instead of silently failing.
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = videoKey;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      throw new Error(
+        'Blob save failed (' + (err.message || 'CORS') +
+        ') — opened in new tab, use long-press → Save video'
+      );
+    }
+
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = videoKey;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+
+    return blob.size;
+  }
+
+  // ============================================================
   // RENDER — 6 columns: #, cover, size, likes, posted, actions
   // (Video key removed from view; still in data-key for Delete)
   // ============================================================
-  
-  async function downloadVideo(videoKey, userId) {
-  const params = new URLSearchParams({
-    videoKey,
-    userId: userId || CONFIG.DEFAULT_USER,
-    disposition: 'attachment',
-  });
-  const res = await http(`${CONFIG.API_BASE}/api/download-b2-file?${params}`);
-  const data = await res.json();
-  if (!data.success) throw new Error(data.error);
-  
-  // Trigger the download on mobile
-  const a = document.createElement('a');
-  a.href = data.downloadUrl;
-  a.download = videoKey;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-  
   function renderRows(items) {
     if (!els.linksTbody) return;
     if (!items || items.length === 0) {
@@ -766,11 +488,11 @@
         <td class="col-likes hide-sm">${Number(it.likes || 0).toLocaleString()}</td>
         <td class="col-date hide-sm">${escHtml((it.postedDate || '').slice(0, 10))}</td>
         <td class="col-actions">
-  <button class="action-btn" data-role="copy-video">Copy Video</button>
-  <button class="action-btn" data-role="download">Download</button>
-  <button class="action-btn" data-role="copy-cover" ${it.coverUrl ? '' : 'disabled' }>Copy Cover</button>
-  <button class="action-btn danger" data-role="delete">Delete</button>
-</td>
+          <button class="action-btn" data-role="copy-video">Copy Video</button>
+          <button class="action-btn" data-role="download">Download</button>
+          <button class="action-btn" data-role="copy-cover" ${it.coverUrl ? '' : 'disabled'}>Copy Cover</button>
+          <button class="action-btn danger" data-role="delete">Delete</button>
+        </td>
       </tr>
     `).join('');
 
@@ -782,8 +504,6 @@
         log(ok ? 'Video URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
       });
     });
-    
-
 
     els.linksTbody.querySelectorAll('button[data-role="copy-cover"]').forEach((b) => {
       b.addEventListener('click', async () => {
@@ -816,22 +536,25 @@
         }
       });
     });
-    
+
     els.linksTbody.querySelectorAll('button[data-role="download"]').forEach((b) => {
-  b.addEventListener('click', async () => {
-    const key = b.closest('tr').getAttribute('data-key');
-    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
-    b.disabled = true;
-    try {
-      await downloadVideo(key, userId);
-      log(`Download started: ${key}`, 'ok');
-    } catch (err) {
-      log(`Download failed: ${err.message}`, 'err');
-    } finally {
-      b.disabled = false;
-    }
-  });
-});
+      b.addEventListener('click', async () => {
+        const key = b.closest('tr').getAttribute('data-key');
+        const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+        b.disabled = true;
+        const label = b.textContent;
+        b.textContent = 'Downloading…';
+        try {
+          const size = await downloadVideo(key, userId);
+          log(`Saved ${key} (${fmtBytes(size)})`, 'ok');
+        } catch (err) {
+          log(`Download: ${err.message}`, 'err');
+        } finally {
+          b.disabled = false;
+          b.textContent = label;
+        }
+      });
+    });
   }
 
   // ============================================================
