@@ -475,6 +475,40 @@ app.post('/api/upload-from-url', async (c) => {
   }
 });
 
+app.get('/api/download-b2-proxy', async (c) => {
+  try {
+    const db = turso();
+    const videoKey = c.req.query('videoKey');
+    const userId = c.req.query('userId') || 'user_123';
+    if (!videoKey) return c.json({ success: false, error: 'videoKey required' }, 400);
+
+    const check = await db.execute({
+      sql: `SELECT video_key, b2_group FROM b2_files WHERE video_key = ? AND user_id = ?`,
+      args: [videoKey, userId],
+    });
+    if (check.rows.length === 0) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+
+    const b2Group = check.rows[0].b2_group;
+    const client = s3(b2Group);
+    const bucket = getBucketForGroup(b2Group);
+
+    // Stream the object straight from B2 through the server
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const obj = await client.send(new GetObjectCommand({ Bucket: bucket, Key: videoKey }));
+
+    const headers = new Headers();
+    headers.set('Content-Type', obj.ContentType || 'video/mp4');
+    if (obj.ContentLength) headers.set('Content-Length', String(obj.ContentLength));
+    headers.set('Content-Disposition', `attachment; filename="${videoKey}"`);
+    headers.set('Cache-Control', 'private, max-age=0, no-store');
+
+    return new Response(obj.Body, { status: 200, headers });
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
 // ============ Download (signed URL) ============
 
 app.get('/api/download-b2-file', async (c) => {
