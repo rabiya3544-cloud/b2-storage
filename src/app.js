@@ -847,6 +847,62 @@ function toItem(r) {
   };
 }
 
+app.get('/api/explore-videos', async (c) => {
+  try {
+    const db = turso();
+    const userId = c.req.query('userId') || 'user_123';
+
+    const hasPagination =
+      c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
+
+    const ORDER = `ORDER BY likes DESC, posted_date DESC, video_key`;
+
+    const toItem = (r) => ({
+      videoKey:   r.video_key,
+      userId:     r.user_id,
+      coverKey:   r.cover_key,
+      videoUrl:   r.video_url,
+      coverUrl:   r.cover_url,
+      fileSize:   r.file_size,
+      createdAt:  r.created_at,
+      likes:      r.likes,
+      postedDate: r.posted_date,
+    });
+
+    if (!hasPagination) {
+      const rows = await db.execute({
+        sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
+                     file_size, created_at, likes, posted_date
+              FROM download_links_view
+              WHERE user_id = ?
+              ${ORDER}`,
+        args: [userId],
+      });
+      return c.json({ success: true, items: rows.rows.map(toItem), hasMore: false });
+    }
+
+    const limit  = Math.min(Math.max(Number(c.req.query('limit'))  || 60, 1), 500);
+    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+
+    // Fetch one extra row to know if there's a next page — no COUNT(*).
+    const rows = await db.execute({
+      sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
+                   file_size, created_at, likes, posted_date
+            FROM download_links_view
+            WHERE user_id = ?
+            ${ORDER}
+            LIMIT ? OFFSET ?`,
+      args: [userId, limit + 1, offset],
+    });
+
+    const hasMore = rows.rows.length > limit;
+    const items   = rows.rows.slice(0, limit).map(toItem);
+
+    return c.json({ success: true, items, hasMore });
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
 // ═════════════════════════════════════════════════════════════════
 // TikTok posts — RPC-style bulk insert / update / summary reads
 // ═════════════════════════════════════════════════════════════════
