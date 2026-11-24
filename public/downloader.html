@@ -24,7 +24,6 @@
 }
 
 /* ── Panel-wide loading overlay ──────────────────────────── */
-/* Sits above the pane but *below* .auth-overlay (z-index 1000). */
 .pane { position: relative; }
 
 .pane-overlay {
@@ -35,7 +34,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(6, 18, 20, 0.72);   /* --bg-0 with alpha */
+  background: rgba(6, 18, 20, 0.72);
   border-radius: inherit;
 }
 .pane-overlay.active { display: flex; }
@@ -79,7 +78,6 @@
   text-overflow: ellipsis;
 }
 
-/* ── Spinner (teal, glowing) ─────────────────────────────── */
 .spinner {
   flex-shrink: 0;
   width: 22px;
@@ -92,7 +90,6 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Button-embedded spinner ─────────────────────────────── */
 .btn .btn-spinner {
   display: inline-block;
   width: 11px;
@@ -104,7 +101,6 @@
   border-right-color: transparent;
   animation: spin 0.7s linear infinite;
 }
-/* When busy, override .btn:disabled's dull grey so it stays teal. */
 .btn.busy:disabled {
   background: var(--teal-dim);
   border-color: var(--teal-dim);
@@ -114,7 +110,6 @@
   box-shadow: 0 0 10px -2px var(--teal-glow);
 }
 
-/* ── Table shimmer while refresh in progress ─────────────── */
 .posts-table tbody.loading td {
   color: transparent !important;
   background: linear-gradient(
@@ -203,7 +198,6 @@
   <span>CDN → B2 → Turso</span>
 </footer>
 
-<!-- Auth overlay -->
 <div class="auth-overlay" id="authOverlay">
   <div class="auth-card">
     <h2>API key required</h2>
@@ -252,7 +246,6 @@
     authForm:          $('authForm'),
     authPassword:      $('authPassword'),
     authError:         $('authError'),
-    // loading overlay
     linksOverlay:      $('linksOverlay'),
     linksOverlayTitle: $('linksOverlayTitle'),
     linksOverlaySub:   $('linksOverlaySub'),
@@ -352,7 +345,6 @@
     }
   }
 
-  // Cancel stale responses if the user re-clicks.
   let requestSeq = 0;
   const nextRequestId = () => ++requestSeq;
   const isStale = (id) => id !== requestSeq;
@@ -417,38 +409,26 @@
   }
 
   // ============================================================
-  // DOWNLOAD — Tok Player pattern:
-  //   1) ask server for a fresh signed URL (disposition=attachment)
-  //   2) fetch bytes into a Blob (with CORS)
-  //   3) save via blob: URL + <a download>
-  //   4) if step 2 fails (CORS etc.), fall back to old <a href> behavior
+  // DOWNLOAD — signed attachment URL + browser navigation.
+  // Server returns a small JSON with the URL; the browser then fetches
+  // the file directly from B2. Full size, no proxy, no Vercel cap.
   // ============================================================
   async function downloadVideo(videoKey, userId) {
-  const params = new URLSearchParams({
-    videoKey,
-    userId: userId || CONFIG.DEFAULT_USER,
-  });
-  const proxyUrl = `${CONFIG.API_BASE}/api/download-b2-proxy?${params}`;
-  
-  // fetch from our own server — same origin as the API, no CORS
-  const res = await http(proxyUrl, { method: 'GET' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  
-  const blob = await res.blob();
-  const objUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = objUrl;
-  a.download = videoKey;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
-  return blob.size;
-}
+    const downloadUrl = await fetchAttachmentUrl(videoKey, userId);
+
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = videoKey;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    return 0; // size unknown here; server-side file size shown in table
+  }
 
   // ============================================================
-  // RENDER — 6 columns: #, cover, size, likes, posted, actions
-  // (Video key removed from view; still in data-key for Delete)
+  // RENDER
   // ============================================================
   function renderRows(items) {
     if (!els.linksTbody) return;
@@ -528,12 +508,12 @@
         const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
         b.disabled = true;
         const label = b.textContent;
-        b.textContent = 'Downloading…';
+        b.textContent = 'Signing…';
         try {
-          const size = await downloadVideo(key, userId);
-          log(`Saved ${key} (${fmtBytes(size)})`, 'ok');
+          await downloadVideo(key, userId);
+          log(`Download started: ${key}`, 'ok');
         } catch (err) {
-          log(`Download: ${err.message}`, 'err');
+          log(`Download failed: ${err.message}`, 'err');
         } finally {
           b.disabled = false;
           b.textContent = label;
@@ -593,7 +573,6 @@
     setStatus('Syncing', 'busy');
     log(`POST ${CONFIG.API_BASE}/api/download-links/sync`, 'info');
 
-    // Heartbeat so the log keeps moving if the server is slow.
     const heartbeat = setInterval(() => {
       if (!isStale(myId)) log('Waiting on server…', 'wait');
     }, 8000);
@@ -611,7 +590,6 @@
       log(`Added: ${data.added} · Refreshed: ${data.refreshed} · Skipped: ${data.skipped}`, 'ok');
       setStatus(`+${data.added} ↻${data.refreshed}`, 'done');
 
-      // Keep the overlay up between sync → load so it never flickers.
       setOverlayText('Refreshing table…', `Sync done — ${data.added} added, ${data.refreshed} refreshed.`);
       if (els.linksTbody) els.linksTbody.classList.add('loading');
 
@@ -628,18 +606,12 @@
     }
   }
 
-  // ============================================================
-  // WIRING
-  // ============================================================
   function init() {
     if (els.linksLoadBtn) els.linksLoadBtn.addEventListener('click', () => load());
     if (els.linksSyncBtn) els.linksSyncBtn.addEventListener('click', () => sync());
     initAuth();
   }
 
-  // ============================================================
-  // EXPORT + BOOT
-  // ============================================================
   global.AppDownloadLinks = Object.freeze({
     init,
     load,
