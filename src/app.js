@@ -11,29 +11,58 @@ import { join } from 'path';
 
 const app = new Hono();
 
-let _s3;
+// ============ B2 client cache (per b2_group) ============
 
-function s3() {
-  if (!_s3) {
-    let endpoint = process.env.B2_ENDPOINT_URL;
-    if (!endpoint) throw new Error('B2_ENDPOINT_URL is not set');
-    endpoint = endpoint.replace(/\/+$/, '');
-    const region = new URL(endpoint).hostname.split('.')[1];
-    _s3 = new S3Client({
-  endpoint,
-  region,
-  forcePathStyle: true,
-  // Disable checksum modes that B2 doesn't support
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-  responseChecksumValidation: 'WHEN_REQUIRED',
-  credentials: {
-    accessKeyId: process.env.B2_APPLICATION_KEY_ID,
-    secretAccessKey: process.env.B2_APPLICATION_KEY,
-  },
-});
-  }
-  return _s3;
+const _s3Clients = {};
+
+function normalizeB2Group(b2Group) {
+  const n = Number(b2Group);
+  return n === 1 || n === 2 ? n : 0;
 }
+
+function s3(b2Group = 0) {
+  const t = normalizeB2Group(b2Group);
+  if (_s3Clients[t]) return _s3Clients[t];
+
+  let endpoint = process.env.B2_ENDPOINT_URL;
+  if (!endpoint) throw new Error('B2_ENDPOINT_URL is not set');
+  endpoint = endpoint.replace(/\/+$/, '');
+  const region = new URL(endpoint).hostname.split('.')[1];
+
+  let accessKeyId, secretAccessKey;
+  if (t === 1) {
+    accessKeyId = process.env.B2_APPLICATION_KEY_ID_ONE ?? process.env.B2_APPLICATION_KEY_ID;
+    secretAccessKey = process.env.B2_APPLICATION_KEY_ONE ?? process.env.B2_APPLICATION_KEY;
+  } else if (t === 2) {
+    accessKeyId = process.env.B2_APPLICATION_KEY_ID_TWO ?? process.env.B2_APPLICATION_KEY_ID;
+    secretAccessKey = process.env.B2_APPLICATION_KEY_TWO ?? process.env.B2_APPLICATION_KEY;
+  } else {
+    accessKeyId = process.env.B2_APPLICATION_KEY_ID;
+    secretAccessKey = process.env.B2_APPLICATION_KEY;
+  }
+
+  _s3Clients[t] = new S3Client({
+    endpoint,
+    region,
+    forcePathStyle: true,
+    // Disable checksum modes that B2 doesn't support
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  return _s3Clients[t];
+}
+
+function getBucketForGroup(b2Group) {
+  switch (normalizeB2Group(b2Group)) {
+    case 1: return process.env.B2_BUCKET_NAME_ONE;
+    case 2: return process.env.B2_BUCKET_NAME_TWO;
+    case 0:
+    default: return process.env.B2_BUCKET_NAME;
+  }
+}
+
+// ============ Turso ============
 
 let _turso;
 
@@ -47,6 +76,8 @@ function turso() {
   return _turso;
 }
 
+// ============ Vercel Blob ============
+
 let _blob;
 
 function blob() {
@@ -59,6 +90,8 @@ function blob() {
   }
   return _blob;
 }
+
+// ============ Middleware ============
 
 app.use('*', async (c, next) => {
   c.header('Access-Control-Allow-Origin', '*');
@@ -80,6 +113,8 @@ app.use('/api/*', async (c, next) => {
   }
   await next();
 });
+
+// ============ Debug config ============
 
 app.get('/api/config', async (c) => {
   const pick = (name) => process.env[name] ?? null;
@@ -142,15 +177,27 @@ app.get('/api/config', async (c) => {
     },
   });
 });
+
 // ── Backblaze B2 account info ─────────────────────────────
 // Calls the native b2_authorize_account endpoint and returns
 // only the account info (never the authorizationToken).
+// Optional ?group=0|1|2 to inspect a specific key.
 app.get('/api/b2/account-info', async (c) => {
   try {
-    const keyId = process.env.B2_APPLICATION_KEY_ID;
-    const appKey = process.env.B2_APPLICATION_KEY;
+    const groupParam = normalizeB2Group(c.req.query('group'));
+    let keyId, appKey;
+    if (groupParam === 1) {
+      keyId = process.env.B2_APPLICATION_KEY_ID_ONE ?? process.env.B2_APPLICATION_KEY_ID;
+      appKey = process.env.B2_APPLICATION_KEY_ONE ?? process.env.B2_APPLICATION_KEY;
+    } else if (groupParam === 2) {
+      keyId = process.env.B2_APPLICATION_KEY_ID_TWO ?? process.env.B2_APPLICATION_KEY_ID;
+      appKey = process.env.B2_APPLICATION_KEY_TWO ?? process.env.B2_APPLICATION_KEY;
+    } else {
+      keyId = process.env.B2_APPLICATION_KEY_ID;
+      appKey = process.env.B2_APPLICATION_KEY;
+    }
     if (!keyId || !appKey) {
-      return c.json({ ok: false, error: 'B2_APPLICATION_KEY_ID / B2_APPLICATION_KEY not set' }, 500);
+      return c.json({ ok: false, error: `B2 key for group ${groupParam} not set` }, 500);
     }
 
     const basic = Buffer.from(`${keyId}:${appKey}`).toString('base64');
@@ -179,6 +226,7 @@ app.get('/api/b2/account-info', async (c) => {
 
     return c.json({
       ok: true,
+      group: groupParam,
       accountId: body.accountId,
       apiUrl: body.apiUrl || s.apiUrl,
       downloadUrl: body.downloadUrl || s.downloadUrl,
@@ -196,6 +244,7 @@ app.get('/api/b2/account-info', async (c) => {
   }
 });
 
+// ============ Static HTML ============
 
 app.get('/', async (c) => {
   try {
@@ -252,11 +301,14 @@ app.get('/debug/files', async (c) => {
     return c.json({ error: e.message }, 500);
   }
 });
+
+// ============ Upload from URL ============
+
 const ALLOWED_HOSTS = /(^|\.)(tiktokv|tiktokcdn|byteoversea|ibytedtos|muscdn|tos-)\.com$/i;
 const MAX_BYTES = 350 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 90_000;
 
-async function uploadImageFromUrl(client, imageUrl) {
+async function uploadImageFromUrl(client, imageUrl, bucket) {
   if (!imageUrl) return null;
 
   let parsed;
@@ -286,7 +338,7 @@ async function uploadImageFromUrl(client, imageUrl) {
     const imageUpload = new Upload({
       client,
       params: {
-        Bucket: process.env.B2_BUCKET_NAME,
+        Bucket: bucket,
         Key: coverKey,
         Body: upstream.body,
         ContentType: contentType || 'image/jpeg',
@@ -303,11 +355,14 @@ async function uploadImageFromUrl(client, imageUrl) {
 
 app.post('/api/upload-from-url', async (c) => {
   try {
-    const client = s3();
     const db = turso();
 
-    const { url, userId, date, likes, coverImg } = await c.req.json();
+    const { url, userId, date, likes, coverImg, b2Group } = await c.req.json();
     if (!url) throw new Error('url required');
+
+    const resolvedB2Group = normalizeB2Group(b2Group);
+    const client = s3(resolvedB2Group);
+    const bucket = getBucketForGroup(resolvedB2Group);
 
     const parsed = new URL(url);
     if (!/^https?:$/.test(parsed.protocol)) throw new Error('only http(s) URLs');
@@ -339,7 +394,7 @@ app.post('/api/upload-from-url', async (c) => {
 
       let coverKey = null;
       try {
-        coverKey = await uploadImageFromUrl(client, coverImg);
+        coverKey = await uploadImageFromUrl(client, coverImg, bucket);
       } catch (e) {
         console.error('Cover upload failed:', e.message);
       }
@@ -378,7 +433,7 @@ app.post('/api/upload-from-url', async (c) => {
     const upload = new Upload({
       client,
       params: {
-        Bucket: process.env.B2_BUCKET_NAME,
+        Bucket: bucket,
         Key: filename,
         Body: upstream.body,
         ContentType: 'video/mp4',
@@ -389,7 +444,7 @@ app.post('/api/upload-from-url', async (c) => {
     await upload.done();
     clearTimeout(timer);
 
-    const coverKey = await uploadImageFromUrl(client, coverImg);
+    const coverKey = await uploadImageFromUrl(client, coverImg, bucket);
 
     const resolvedUserId = String(userId || 'user_123').trim().slice(0, 100) || 'user_123';
 
@@ -402,9 +457,9 @@ app.post('/api/upload-from-url', async (c) => {
 
     await db.execute({
       sql: `INSERT INTO b2_files
-              (video_key, cover_key, user_id, likes, posted_date, file_size)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [filename, coverKey, resolvedUserId, initialLikes, postedDate, contentLength || null],
+              (video_key, cover_key, user_id, likes, posted_date, file_size, b2_group)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [filename, coverKey, resolvedUserId, initialLikes, postedDate, contentLength || null, resolvedB2Group],
     });
 
     return c.json({
@@ -412,6 +467,7 @@ app.post('/api/upload-from-url', async (c) => {
       videoKey: filename,
       coverKey: coverKey || null,
       bytes: contentLength || null,
+      b2Group: resolvedB2Group,
     });
   } catch (error) {
     console.error('Upload Error:', error.message);
@@ -419,42 +475,47 @@ app.post('/api/upload-from-url', async (c) => {
   }
 });
 
+// ============ Download (signed URL) ============
+
 app.get('/api/download-b2-file', async (c) => {
   try {
-    const client = s3();
     const db = turso();
-    
+
     const videoKey = c.req.query('videoKey');
     const userId = c.req.query('userId') || 'user_123';
     if (!videoKey) throw new Error('videoKey required');
-    
+
     const check = await db.execute({
-      sql: `SELECT video_key FROM b2_files
+      sql: `SELECT video_key, b2_group FROM b2_files
             WHERE video_key = ? AND user_id = ?`,
       args: [videoKey, userId],
     });
     if (check.rows.length === 0) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    
+
+    const b2Group = check.rows[0].b2_group;
+    const client = s3(b2Group);
+    const bucket = getBucketForGroup(b2Group);
+
     const disposition = c.req.query('disposition') || 'inline';
 
-const command = {
-  Bucket: process.env.B2_BUCKET_NAME,
-  Key: videoKey,
-};
+    const command = {
+      Bucket: bucket,
+      Key: videoKey,
+    };
 
-if (disposition === 'attachment') {
-  const filename = `${userId}_${videoKey}`;
-const encoded = encodeURIComponent(filename);
-command.ResponseContentDisposition =
-  `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
-}
+    if (disposition === 'attachment') {
+      const filename = `${userId}_${videoKey}`;
+      const encoded = encodeURIComponent(filename);
+      command.ResponseContentDisposition =
+        `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+    }
 
-const downloadUrl = await getSignedUrl(client, new GetObjectCommand(command), { expiresIn: 259200 });
+    const downloadUrl = await getSignedUrl(client, new GetObjectCommand(command), { expiresIn: 259200 });
 
-return c.json({ success: true, downloadUrl });
-    
+    return c.json({ success: true, downloadUrl });
+
   } catch (error) {
     return c.json({ success: false, error: error.message }, 500);
   }
@@ -462,7 +523,6 @@ return c.json({ success: true, downloadUrl });
 
 app.get('/api/download-b2-cover', async (c) => {
   try {
-    const client = s3();
     const db = turso();
 
     const coverKey = c.req.query('coverKey');
@@ -470,7 +530,7 @@ app.get('/api/download-b2-cover', async (c) => {
     if (!coverKey) throw new Error('coverKey required');
 
     const check = await db.execute({
-      sql: `SELECT cover_key FROM b2_files
+      sql: `SELECT cover_key, b2_group FROM b2_files
             WHERE cover_key = ? AND user_id = ?`,
       args: [coverKey, userId],
     });
@@ -478,8 +538,12 @@ app.get('/api/download-b2-cover', async (c) => {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
 
+    const b2Group = check.rows[0].b2_group;
+    const client = s3(b2Group);
+    const bucket = getBucketForGroup(b2Group);
+
     const command = new GetObjectCommand({
-      Bucket: process.env.B2_BUCKET_NAME,
+      Bucket: bucket,
       Key: coverKey,
     });
     const downloadUrl = await getSignedUrl(client, command, { expiresIn: 259200 });
@@ -522,15 +586,25 @@ const STALE_HOURS = 48; // refresh URLs older than this; 3-day URLs get 1 day of
 
 app.post('/api/download-links/sync', async (c) => {
   try {
-    const client = s3();
     const db = turso();
-    const { userId } = await c.req.json();
+    const { userId, b2Group } = await c.req.json();
     const resolvedUserId = String(userId || 'user_123').trim().slice(0, 100) || 'user_123';
 
-    // All videos the user owns in b2_files
-        // const allVideos = await db.execute({sql: `SELECT video_key, cover_key, file_size FROM b2_files WHERE user_id = ?`, args: [resolvedUserId],});
-    
-    const allVideos = await db.execute({sql: `SELECT video_key, cover_key, file_size FROM b2_files WHERE user_id = ? AND b2_group = ?`, args: [resolvedUserId, 1],});
+    // Optional filter by b2_group. If not provided, process every group the user owns.
+    const hasGroupFilter = b2Group !== undefined && b2Group !== null && b2Group !== '';
+    const groupFilter = hasGroupFilter ? normalizeB2Group(b2Group) : null;
+
+    const allVideos = hasGroupFilter
+      ? await db.execute({
+          sql: `SELECT video_key, cover_key, file_size, b2_group
+                FROM b2_files WHERE user_id = ? AND b2_group = ?`,
+          args: [resolvedUserId, groupFilter],
+        })
+      : await db.execute({
+          sql: `SELECT video_key, cover_key, file_size, b2_group
+                FROM b2_files WHERE user_id = ?`,
+          args: [resolvedUserId],
+        });
 
     // Rows in download_links that are still fresh (created within STALE_HOURS)
     const fresh = await db.execute({
@@ -547,8 +621,11 @@ app.post('/api/download-links/sync', async (c) => {
 
     let added = 0, refreshed = 0;
     for (const r of toProcess) {
+      const client = s3(r.b2_group);
+      const bucket = getBucketForGroup(r.b2_group);
+
       const videoCmd = new GetObjectCommand({
-        Bucket: process.env.B2_BUCKET_NAME,
+        Bucket: bucket,
         Key: r.video_key,
       });
       const videoUrl = await getSignedUrl(client, videoCmd, { expiresIn: 259200 });
@@ -556,7 +633,7 @@ app.post('/api/download-links/sync', async (c) => {
       let coverUrl = null;
       if (r.cover_key) {
         const coverCmd = new GetObjectCommand({
-          Bucket: process.env.B2_BUCKET_NAME,
+          Bucket: bucket,
           Key: r.cover_key,
         });
         coverUrl = await getSignedUrl(client, coverCmd, { expiresIn: 259200 });
@@ -592,6 +669,7 @@ app.post('/api/download-links/sync', async (c) => {
       skipped,
       total: allVideos.rows.length,
       staleHours: STALE_HOURS,
+      b2Group: hasGroupFilter ? groupFilter : 'all',
     });
   } catch (error) {
     return c.json({ success: false, error: error.message }, 500);
@@ -655,21 +733,28 @@ app.get('/api/b2-files-count', async (c) => {
   try {
     const db = turso();
     const userId = c.req.query('userId');
+    const b2GroupQuery = c.req.query('b2Group');
 
-    let result;
-    if (userId) {
-      result = await db.execute({
-        sql: `SELECT COUNT(*) AS n FROM b2_files WHERE user_id = ?`,
-        args: [userId],
-      });
-    } else {
-      result = await db.execute({
-        sql: `SELECT COUNT(*) AS n FROM b2_files`,
-      });
+    const filters = [];
+    const args = [];
+    if (userId) { filters.push('user_id = ?'); args.push(userId); }
+    if (b2GroupQuery !== undefined && b2GroupQuery !== '') {
+      filters.push('b2_group = ?'); args.push(normalizeB2Group(b2GroupQuery));
     }
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM b2_files ${where}`,
+      args,
+    });
 
     const count = Number(result.rows[0]?.n) || 0;
-    return c.json({ success: true, count, userId: userId || null });
+    return c.json({
+      success: true,
+      count,
+      userId: userId || null,
+      b2Group: b2GroupQuery !== undefined && b2GroupQuery !== '' ? normalizeB2Group(b2GroupQuery) : null,
+    });
   } catch (error) {
     return c.json({ success: false, error: error.message }, 500);
   }
@@ -710,11 +795,6 @@ app.get('/api/download-links-view', async (c) => {
 
 // ═════════════════════════════════════════════════════════════════
 // TikTok posts — RPC-style bulk insert / update / summary reads
-// Contract preserved from the standalone handler:
-//   POST /api/tiktok   { action, payload }      → writes
-//   GET  /api/tiktok?action=X&…                 → reads / counts / debug
-// Auth: covered by the existing /api/* X-API-Key middleware.
-// Reuses the app-wide turso() client. No new env vars, no new imports.
 // ═════════════════════════════════════════════════════════════════
 
 function rowsToObjects(result) {
@@ -906,7 +986,7 @@ async function tiktokDebugViewCols() {
 app.post('/api/tiktok', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { action, payload = {} } = body || {};
-  
+
   try {
     switch (action) {
       case 'insertPost': {
@@ -965,7 +1045,7 @@ app.post('/api/tiktok', async (c) => {
 // ── GET /api/tiktok ──────────────────────────────────────────────
 app.get('/api/tiktok', async (c) => {
   const action = c.req.query('action');
-  
+
   try {
     switch (action) {
       case 'getPostsSummary': {
@@ -982,7 +1062,7 @@ app.get('/api/tiktok', async (c) => {
         const n = clamp(Number(c.req.query('n') ?? 10), 1, 3000);
         return c.json({ result: await tiktokGetTopLikedPosts(n) });
       }
-        case 'getTopFiledPosts': {
+      case 'getTopFiledPosts': {
         const n = clamp(Number(c.req.query('n') ?? 10), 1, 3000);
         return c.json({ result: await tiktokGetFailedPosts(n) });
       }
@@ -1017,9 +1097,6 @@ app.get('/api/tiktok', async (c) => {
 // Two modes:
 //   application/json     → server fetches from TikTok CDN
 //   multipart/form-data  → browser uploads bytes directly (preferred)
-// Mounted at /api/upload-cover-to-blob → covered by the existing
-// X-API-Key middleware and CORS headers. Reuses ALLOWED_HOSTS.
-// Needs: BLOB_READ_WRITE_TOKEN env var + @vercel/blob dependency.
 // ═════════════════════════════════════════════════════════════════
 
 function sanitizeCoverDate(date) {
@@ -1054,7 +1131,7 @@ async function putCoverBlob({ body, contentType, date, likes, userId, sourceLink
   const ext = pickImageExt(extHint, contentType);
   const userSeg = sanitizeUserId(userId) || 'unknown';
   const pathname = `${userSeg}/cover_${dateStr}.${ext}`;
-  
+
   const blobRes = await blob().put(pathname, body, {
     access: 'public',
     addRandomSuffix: false,
@@ -1066,7 +1143,7 @@ async function putCoverBlob({ body, contentType, date, likes, userId, sourceLink
       userId: String(userId || ''),
     },
   });
-  
+
   return {
     success: true,
     pathname: blobRes.pathname,
@@ -1191,12 +1268,11 @@ app.post('/api/upload-cover-to-blob', async (c) => {
 // ── end upload cover to blob ─────────────────────────────────────
 
 // ═════════════════════════════════════════════════════════════════
-// Local file uploads (self-contained — no dependency on tiktok helpers)
-// Routes: /api/local-files/*  (protected by existing X-API-Key middleware)
-// Reuses s3(), turso(), MAX_BYTES. Own row/serialisation helpers below.
+// Local file uploads (self-contained)
+// NOTE: local_files has no b2_group column — everything stays on group 0.
+// If you want per-group local files, add `b2_group` to the schema and pass it through.
 // ═════════════════════════════════════════════════════════════════
 
-// local-files-specific helpers (prefixed `lf` to avoid any collision)
 function lfRowsToObjects(result) {
   const cols = (result.columns || []).map(c => (typeof c === 'string' ? c : c.name));
   return (result.rows || []).map(row => {
@@ -1220,7 +1296,9 @@ function lfFirstScalar(result) {
 // POST /api/local-files/upload
 app.post('/api/local-files/upload', async (c) => {
   try {
-    const client = s3();
+    // local_files: group 0 only
+    const client = s3(0);
+    const bucket = getBucketForGroup(0);
     const db = turso();
 
     const body = await c.req.parseBody();
@@ -1245,7 +1323,7 @@ app.post('/api/local-files/upload', async (c) => {
     const upload = new Upload({
       client,
       params: {
-        Bucket: process.env.B2_BUCKET_NAME,
+        Bucket: bucket,
         Key: fileKey,
         Body: file.stream(),
         ContentType: fileType,
@@ -1311,7 +1389,9 @@ app.get('/api/local-files/list', async (c) => {
 // GET /api/local-files/download — 3-day signed URL
 app.get('/api/local-files/download', async (c) => {
   try {
-    const client = s3();
+    // local_files: group 0 only
+    const client = s3(0);
+    const bucket = getBucketForGroup(0);
     const db = turso();
     const fileKey = c.req.query('fileKey');
     const userId = c.req.query('userId') || 'user_123';
@@ -1331,7 +1411,7 @@ app.get('/api/local-files/download', async (c) => {
 
     const downloadUrl = await getSignedUrl(
       client,
-      new GetObjectCommand({ Bucket: process.env.B2_BUCKET_NAME, Key: fileKey }),
+      new GetObjectCommand({ Bucket: bucket, Key: fileKey }),
       { expiresIn: 259200 }
     );
 
@@ -1352,7 +1432,9 @@ app.get('/api/local-files/download', async (c) => {
 // DELETE /api/local-files/delete
 app.delete('/api/local-files/delete', async (c) => {
   try {
-    const client = s3();
+    // local_files: group 0 only
+    const client = s3(0);
+    const bucket = getBucketForGroup(0);
     const db = turso();
     const fileKey = c.req.query('fileKey');
     const userId = c.req.query('userId') || 'user_123';
@@ -1367,7 +1449,7 @@ app.delete('/api/local-files/delete', async (c) => {
     }
 
     await client.send(new DeleteObjectCommand({
-      Bucket: process.env.B2_BUCKET_NAME,
+      Bucket: bucket,
       Key: fileKey,
     }));
 
