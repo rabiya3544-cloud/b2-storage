@@ -982,8 +982,8 @@ return out;
         return;
     }
     const filtered = filterByLikes(items, 50, 'likes');
-    // const randomized = shuffles(filtered);
-    grid.innerHTML = filtered.map((item, i) => {
+    const randomized = shuffles(filtered);
+    grid.innerHTML = randomized.map((item, i) => {
             const cover = escHtml(item.coverUrl || '');
             const video = escHtml(item.videoUrl || '');
             const likes = Number(item.likes || 0).toLocaleString();
@@ -1191,68 +1191,67 @@ init();
         // Server signs; browser goes direct to B2. Full size, no proxy.
         // ============================================================
         async function downloadCurrent() {
-            if (!currentItem) return;
-            const key = currentItem.videoKey;
-            if (!key) {
-                flashDownloadFeedback(false);
-                return;
-            }
+    if (!currentItem) return;
+    const key = currentItem.videoKey;
+    if (!key) {
+        flashDownloadFeedback(false);
+        return;
+    }
 
-            const btn = els.railDownload;
-            if (btn) btn.disabled = true;
-            const icon = btn ? btn.querySelector('i') : null;
-            const prevIcon = icon ? icon.className : '';
-            if (icon) icon.className = 'fa-solid fa-circle-notch fa-spin';
+    const btn = els.railDownload;
+    const icon = btn ? btn.querySelector('i') : null;
 
-            try {
-                const apiKey = localStorage.getItem('xapiKey') || '';
-                const params = new URLSearchParams({
-                    videoKey: key,
-                    userId: CONFIG.DEFAULT_USER,
-                    disposition: 'attachment',
-                });
-                const res = await fetch(
-                    CONFIG.API_BASE + '/api/download-b2-file?' + params.toString(),
-                    { headers: apiKey ? { 'X-API-Key': apiKey } : {} }
-                );
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data.success || !data.downloadUrl) {
-                    throw new Error(data.error || ('HTTP ' + res.status));
-                }
+    if (btn) btn.disabled = true;
+    if (icon) icon.className = 'fa-solid fa-circle-notch fa-spin';
 
-                const a = document.createElement('a');
-                a.href = data.downloadUrl;
-                a.download = key;
-                a.rel = 'noopener';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-
-                flashDownloadFeedback(true);
-            } catch (err) {
-                console.error('[AppVideoPlayer] download failed:', err);
-                flashDownloadFeedback(false);
-            } finally {
-                if (btn) btn.disabled = false;
-                if (icon) icon.className = prevIcon;
-            }
+    try {
+        const apiKey = localStorage.getItem('xapiKey') || '';
+        const params = new URLSearchParams({
+            videoKey: key,
+            userId: CONFIG.DEFAULT_USER,
+            disposition: 'attachment',
+        });
+        const res = await fetch(
+            CONFIG.API_BASE + '/api/download-b2-file?' + params.toString(),
+            { headers: apiKey ? { 'X-API-Key': apiKey } : {} }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success || !data.downloadUrl) {
+            throw new Error(data.error || ('HTTP ' + res.status));
         }
 
-        function flashDownloadFeedback(ok) {
-            const btn = els.railDownload;
-            if (!btn) return;
-            const icon = btn.querySelector('i');
-            if (!icon) return;
-            const prev = icon.className;
-            icon.className = ok ? 'fa-solid fa-check' : 'fa-solid fa-triangle-exclamation';
-            icon.style.color = ok ? 'var(--teal)' : 'var(--accent-error)';
-            icon.style.textShadow = ok ? '0 0 12px var(--teal-glow)' : 'none';
-            setTimeout(() => {
-                icon.className = prev;
-                icon.style.color = '';
-                icon.style.textShadow = '';
-            }, 1400);
-        }
+        const a = document.createElement('a');
+        a.href = data.downloadUrl;
+        a.download = key;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        flashDownloadFeedback(true);
+    } catch (err) {
+        console.error('[AppVideoPlayer] download failed:', err);
+        flashDownloadFeedback(false);
+    } finally {
+        if (btn) btn.disabled = false;
+        // NOTE: do NOT touch the icon here.
+    }
+}
+
+function flashDownloadFeedback(ok) {
+    const btn = els.railDownload;
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    if (!icon) return;
+    icon.className = ok ? 'fa-solid fa-check' : 'fa-solid fa-triangle-exclamation';
+    icon.style.color = ok ? 'var(--teal)' : 'var(--accent-error)';
+    icon.style.textShadow = ok ? '0 0 12px var(--teal-glow)' : 'none';
+    setTimeout(() => {
+        icon.className = 'fa-solid fa-download';   // hard-coded, never prev
+        icon.style.color = '';
+        icon.style.textShadow = '';
+    }, 1400);
+}
         
         function bind() {
             if (!els.overlay) return;
