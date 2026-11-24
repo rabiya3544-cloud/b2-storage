@@ -424,42 +424,27 @@
   //   4) if step 2 fails (CORS etc.), fall back to old <a href> behavior
   // ============================================================
   async function downloadVideo(videoKey, userId) {
-    const downloadUrl = await fetchAttachmentUrl(videoKey, userId);
-
-    // Try the Blob path first — this is what makes mobile save the file.
-    let blob = null;
-    try {
-      const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      blob = await res.blob();
-    } catch (err) {
-      // Blob path failed (likely CORS). Fall back to old behavior so the
-      // button still does something useful instead of silently failing.
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = videoKey;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      throw new Error(
-        'Blob save failed (' + (err.message || 'CORS') +
-        ') — opened in new tab, use long-press → Save video'
-      );
-    }
-
-    const objUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objUrl;
-    a.download = videoKey;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
-
-    return blob.size;
-  }
+  const params = new URLSearchParams({
+    videoKey,
+    userId: userId || CONFIG.DEFAULT_USER,
+  });
+  const proxyUrl = `${CONFIG.API_BASE}/api/download-b2-proxy?${params}`;
+  
+  // fetch from our own server — same origin as the API, no CORS
+  const res = await http(proxyUrl, { method: 'GET' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = videoKey;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+  return blob.size;
+}
 
   // ============================================================
   // RENDER — 6 columns: #, cover, size, likes, posted, actions
