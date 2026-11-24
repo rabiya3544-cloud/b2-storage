@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>B2 + Turso — Download Links</title>
+<link rel="stylesheet" href="../app.css">
+<style>
+.table-wrap { overflow: auto; }
+.posts-table td.col-actions { overflow: visible; white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .posts-table th.hide-sm,
+  .posts-table td.hide-sm { display: none; }
+}
+</style>
+<style>
+.table-wrap { overflow: auto; }
+.posts-table td.col-actions { overflow: visible; white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .posts-table th.hide-sm,
+  .posts-table td.hide-sm { display: none; }
+}
+
+/* ── Panel-wide loading overlay ──────────────────────────── */
+/* Sits above the pane but *below* .auth-overlay (z-index 1000). */
+.pane { position: relative; }
+
+.pane-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 18, 20, 0.72);   /* --bg-0 with alpha */
+  border-radius: inherit;
+}
+.pane-overlay.active { display: flex; }
+
+.pane-overlay-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 88%;
+  padding: 16px 20px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.9),
+    0 8px 16px -2px rgba(0, 0, 0, 0.9),
+    0 18px 32px -6px rgba(0, 0, 0, 0.75),
+    0 0 24px -4px rgba(20, 240, 200, 0.22);
+}
+
+.pane-overlay-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.pane-overlay-text strong {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+  text-shadow: 0 0 10px var(--teal-glow);
+}
+.pane-overlay-text small {
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Spinner (teal, glowing) ─────────────────────────────── */
+.spinner {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid var(--bg-3);
+  border-top-color: var(--teal);
+  box-shadow: 0 0 10px -2px var(--teal-glow);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Button-embedded spinner ─────────────────────────────── */
+.btn .btn-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+/* When busy, override .btn:disabled's dull grey so it stays teal. */
+.btn.busy:disabled {
+  background: var(--teal-dim);
+  border-color: var(--teal-dim);
+  color: var(--bg-0);
+  opacity: 0.85;
+  cursor: progress;
+  box-shadow: 0 0 10px -2px var(--teal-glow);
+}
+
+/* ── Table shimmer while refresh in progress ─────────────── */
+.posts-table tbody.loading td {
+  color: transparent !important;
+  background: linear-gradient(
+    90deg,
+    var(--code-bg) 0%,
+    rgba(20, 240, 200, 0.06) 50%,
+    var(--code-bg) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>B2 + Turso</h1>
+  <span class="sub">Download Links</span>
+  <nav class="page-nav">
+    <a href="/files" class="page-link">Files</a>
+    <a href="/play" class="page-link">Play</a>
+  </nav>
+</header>
+
+<main>
+  <div class="panes">
+
+<section class="pane active" id="links">
+    <div class="pane-overlay" id="linksOverlay" aria-hidden="true">
+  <div class="pane-overlay-card">
+    <div class="spinner"></div>
+    <div class="pane-overlay-text">
+      <strong id="linksOverlayTitle">Working…</strong>
+      <small id="linksOverlaySub">This can take up to a minute.</small>
+    </div>
+  </div>
+</div>
+      <h2>Download links</h2>
+
+      <div class="field">
+        <label for="linksUserId">User ID</label>
+        <input type="text" id="linksUserId" placeholder="jafernegery" value="jafernegery" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="row">
+        <button class="btn" id="linksSyncBtn">Sync</button>
+        <button class="btn" id="linksLoadBtn">Load</button>
+      </div>
+
+      <h3>Results</h3>
+      <div class="flex-1">
+        <div class="table-wrap">
+          <table class="posts-table">
+            <thead>
+              <tr>
+                <th class="col-sno">#</th>
+                <th class="col-cover">Cover</th>
+                <th class="col-date hide-sm">Size</th>
+                <th class="col-likes hide-sm">Likes</th>
+                <th class="col-date hide-sm">Posted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="links-tbody">
+              <tr><td colspan="6" class="row-empty">Not loaded</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3>Log</h3>
+      <div class="log flex-1">
+        <div class="log-header">
+          <span>Activity</span>
+          <span class="status" id="linksStatus">Idle</span>
+        </div>
+        <div class="log-body" id="linksLog"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <span><span class="dot">●</span> B2 + Turso</span>
+  <span>CDN → B2 → Turso</span>
+</footer>
+
+<!-- Auth overlay -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <h2>API key required</h2>
+    <p class="lead">This page needs the B2 backend API key.</p>
+    <form id="authForm">
+      <div class="field">
+        <label for="authPassword">API key</label>
+        <input type="password" id="authPassword" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button class="btn" type="submit">Continue</button>
+    </form>
+  </div>
+</div>
+<!--
+<script>
+// ============================================================
+// 02-downloadUrlFromB2.js — standalone Download Links page.
+// Mirror of app.js Module 9 (Links) + Module 2 (Auth), scoped to one page.
+// ============================================================
+(function (global) {
+  'use strict';
+  if (global.AppDownloadLinks) { return; }
+
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const CONFIG = Object.freeze({
+    API_BASE: 'https://b2-storage-kappa.vercel.app',
+    DEFAULT_USER: 'jafernegery',
+    LS_API_KEY: 'xapiKey',
+  });
+
+  // ============================================================
+  // DOM
+  // ============================================================
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    linksTbody:   $('links-tbody'),
+    linksLog:     $('linksLog'),
+    linksStatus:  $('linksStatus'),
+    linksSyncBtn: $('linksSyncBtn'),
+    linksLoadBtn: $('linksLoadBtn'),
+    linksUserId:  $('linksUserId'),
+    authOverlay:  $('authOverlay'),
+    authForm:     $('authForm'),
+    authPassword: $('authPassword'),
+    authError:    $('authError'),
+  };
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+
+  const fmtBytes = (b) => {
+    if (!b || b < 0) return '—';
+    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB';
+    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' MB';
+    if (b >= 1024)       return Math.round(b / 1024) + ' KB';
+    return b + ' B';
+  };
+
+  const setStatus = (text, cls) => {
+    if (!els.linksStatus) return;
+    els.linksStatus.textContent = text;
+    els.linksStatus.className = `status ${cls || ''}`;
+  };
+
+  const log = (msg, kind = 'info') => {
+    if (!els.linksLog) return;
+    const line = document.createElement('span');
+    line.className = `line ${kind}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    els.linksLog.appendChild(line);
+    els.linksLog.scrollTop = els.linksLog.scrollHeight;
+  };
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }
+  }
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+  let apiKey = localStorage.getItem(CONFIG.LS_API_KEY) || '';
+
+  function showAuthOverlay(msg) {
+    if (!els.authOverlay) return;
+    if (els.authError) els.authError.textContent = msg || '';
+    els.authOverlay.classList.add('active');
+    setTimeout(() => els.authPassword && els.authPassword.focus(), 50);
+  }
+  function hideAuthOverlay() {
+    if (els.authOverlay) els.authOverlay.classList.remove('active');
+  }
+  function setApiKey(val) {
+    apiKey = val;
+    localStorage.setItem(CONFIG.LS_API_KEY, val);
+  }
+  function getApiKey() { return apiKey; }
+
+  function initAuth() {
+    if (els.authForm) {
+      els.authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const val = els.authPassword ? els.authPassword.value : '';
+        if (!val) return;
+        setApiKey(val);
+        hideAuthOverlay();
+        if (els.authPassword) els.authPassword.value = '';
+        if (els.authError) els.authError.textContent = '';
+      });
+    }
+    if (!apiKey) showAuthOverlay('');
+  }
+
+  // ============================================================
+  // HTTP — attaches X-API-Key ONLY to CONFIG.API_BASE
+  // ============================================================
+  async function http(input, init = {}) {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const needsAuth =
+      url === CONFIG.API_BASE || url.indexOf(CONFIG.API_BASE + '/') === 0;
+
+    let nextInit = init;
+    if (needsAuth && getApiKey()) {
+      nextInit = Object.assign({}, init, {
+        headers: Object.assign({}, init.headers || {}, {
+          'X-API-Key': getApiKey(),
+        }),
+      });
+    }
+
+    const res = await fetch(input, nextInit);
+    if (res.status === 401) {
+      showAuthOverlay('Wrong password. Try again.');
+    }
+    return res;
+  }
+
+  // ============================================================
+  // RENDER — 6 columns: #, cover, size, likes, posted, actions
+  // (Video key removed from view; still in data-key for Delete)
+  // ============================================================
+  function renderRows(items) {
+    if (!els.linksTbody) return;
+    if (!items || items.length === 0) {
+      els.linksTbody.innerHTML = '<tr><td colspan="6" class="row-empty">No links.</td></tr>';
+      return;
+    }
+
+    els.linksTbody.innerHTML = items.map((it, i) => `
+      <tr
+        data-key="${escHtml(it.videoKey)}"
+        data-video-url="${escHtml(it.videoUrl || '')}"
+        data-cover-url="${escHtml(it.coverUrl || '')}"
+      >
+        <td class="col-sno">${i + 1}</td>
+        <td class="col-cover">
+          ${it.coverUrl
+            ? `<img src="${escHtml(it.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+            : `<div class="no-cover"></div>`}
+        </td>
+        <td class="col-date hide-sm">${fmtBytes(it.fileSize)}</td>
+        <td class="col-likes hide-sm">${Number(it.likes || 0).toLocaleString()}</td>
+        <td class="col-date hide-sm">${escHtml((it.postedDate || '').slice(0, 10))}</td>
+        <td class="col-actions">
+          <button class="action-btn" data-role="copy-video">Copy Video</button>
+          <button class="action-btn" data-role="copy-cover" ${it.coverUrl ? '' : 'disabled'}>Copy Cover</button>
+          <button class="action-btn danger" data-role="delete">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+
+    els.linksTbody.querySelectorAll('button[data-role="copy-video"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const url = b.closest('tr').getAttribute('data-video-url');
+        if (!url) { log('No video URL.', 'err'); return; }
+        const ok = await copyText(url);
+        log(ok ? 'Video URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
+      });
+    });
+
+    els.linksTbody.querySelectorAll('button[data-role="copy-cover"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const url = b.closest('tr').getAttribute('data-cover-url');
+        if (!url) { log('No cover URL.', 'err'); return; }
+        const ok = await copyText(url);
+        log(ok ? 'Cover URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
+      });
+    });
+
+    els.linksTbody.querySelectorAll('button[data-role="delete"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const tr  = b.closest('tr');
+        const key = tr.getAttribute('data-key');
+        if (!global.confirm(`Delete row for ${key}?`)) return;
+
+        try {
+          const params = new URLSearchParams({ videoKey: key });
+          const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+          if (userId) params.set('userId', userId);
+
+          const res  = await http(`${CONFIG.API_BASE}/api/download-links?${params}`, { method: 'DELETE' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+
+          tr.remove();
+          log(`Deleted: ${key}`, 'ok');
+        } catch (err) {
+          log(`Delete failed: ${err.message}`, 'err');
+        }
+      });
+    });
+  }
+
+  // ============================================================
+  // API CALLS
+  // ============================================================
+  async function load() {
+    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+    if (els.linksLoadBtn) els.linksLoadBtn.disabled = true;
+    setStatus('Loading', 'busy');
+    log(`GET ${CONFIG.API_BASE}/api/download-links-view?userId=${userId || '(default)'}`, 'info');
+
+    try {
+      const params = new URLSearchParams();
+      if (userId) params.set('userId', userId);
+
+      const res  = await http(`${CONFIG.API_BASE}/api/download-links-view?${params}`);
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+
+      renderRows(data.items || []);
+      const n = data.items ? data.items.length : 0;
+      setStatus(`Loaded ${n}`, 'done');
+      log(`Loaded ${n} row(s).`, 'ok');
+    } catch (err) {
+      if (els.linksTbody) {
+        els.linksTbody.innerHTML = `<tr><td colspan="6" class="row-error">Failed: ${escHtml(err.message)}</td></tr>`;
+      }
+      setStatus('Failed', 'failed');
+      log(`Failed: ${err.message}`, 'err');
+    } finally {
+      if (els.linksLoadBtn) els.linksLoadBtn.disabled = false;
+    }
+  }
+
+  async function sync() {
+    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+    if (els.linksSyncBtn) els.linksSyncBtn.disabled = true;
+    setStatus('Syncing', 'busy');
+    log(`POST ${CONFIG.API_BASE}/api/download-links/sync`, 'info');
+
+    try {
+      const res  = await http(`${CONFIG.API_BASE}/api/download-links/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId || undefined }),
+      });
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+
+      log(`Added: ${data.added} · Refreshed: ${data.refreshed} · Skipped: ${data.skipped}`, 'ok');
+      setStatus(`+${data.added} ↻${data.refreshed}`, 'done');
+      await load();
+    } catch (err) {
+      setStatus('Failed', 'failed');
+      log(`Sync failed: ${err.message}`, 'err');
+    } finally {
+      if (els.linksSyncBtn) els.linksSyncBtn.disabled = false;
+    }
+  }
+
+  // ============================================================
+  // WIRING
+  // ============================================================
+  function init() {
+    if (els.linksLoadBtn) els.linksLoadBtn.addEventListener('click', load);
+    if (els.linksSyncBtn) els.linksSyncBtn.addEventListener('click', sync);
+    initAuth();
+  }
+
+  // ============================================================
+  // EXPORT + BOOT
+  // ============================================================
+  global.AppDownloadLinks = Object.freeze({
+    init,
+    load,
+    sync,
+    showAuthOverlay,
+    hideAuthOverlay,
+    getApiKey,
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})(window);
+</script>
+-->
+<script>
+// ============================================================
+// 02-downloadUrlFromB2.js — standalone Download Links page.
+// Mirror of app.js Module 9 (Links) + Module 2 (Auth), scoped to one page.
+// ============================================================
+(function (global) {
+  'use strict';
+  if (global.AppDownloadLinks) { return; }
+
+  // ============================================================
+  // CONFIG
+  // ============================================================
+  const CONFIG = Object.freeze({
+    API_BASE: 'https://b2-storage-kappa.vercel.app',
+    DEFAULT_USER: 'jafernegery',
+    LS_API_KEY: 'xapiKey',
+  });
+
+  // ============================================================
+  // DOM
+  // ============================================================
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    linksTbody:        $('links-tbody'),
+    linksLog:          $('linksLog'),
+    linksStatus:       $('linksStatus'),
+    linksSyncBtn:      $('linksSyncBtn'),
+    linksLoadBtn:      $('linksLoadBtn'),
+    linksUserId:       $('linksUserId'),
+    authOverlay:       $('authOverlay'),
+    authForm:          $('authForm'),
+    authPassword:      $('authPassword'),
+    authError:         $('authError'),
+    // loading overlay
+    linksOverlay:      $('linksOverlay'),
+    linksOverlayTitle: $('linksOverlayTitle'),
+    linksOverlaySub:   $('linksOverlaySub'),
+  };
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+
+  const fmtBytes = (b) => {
+    if (!b || b < 0) return '—';
+    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB';
+    if (b >= 1048576)    return (b / 1048576).toFixed(1) + ' MB';
+    if (b >= 1024)       return Math.round(b / 1024) + ' KB';
+    return b + ' B';
+  };
+
+  const setStatus = (text, cls) => {
+    if (!els.linksStatus) return;
+    els.linksStatus.textContent = text;
+    els.linksStatus.className = `status ${cls || ''}`;
+  };
+
+  const log = (msg, kind = 'info') => {
+    if (!els.linksLog) return;
+    const line = document.createElement('span');
+    line.className = `line ${kind}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    els.linksLog.appendChild(line);
+    els.linksLog.scrollTop = els.linksLog.scrollHeight;
+  };
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }
+  }
+  
+  async function fetchAttachmentUrl(videoKey, userId) {
+  const params = new URLSearchParams({
+    videoKey,
+    userId: userId || CONFIG.DEFAULT_USER,
+    disposition: 'attachment',
+  });
+  const res = await http(`${CONFIG.API_BASE}/api/download-b2-file?${params}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.downloadUrl;
+}
+  // ============================================================
+  // LOADING OVERLAY + BUSY-BUTTON HELPERS
+  // ============================================================
+  function showOverlay(title, sub) {
+    if (!els.linksOverlay) return;
+    if (els.linksOverlayTitle) els.linksOverlayTitle.textContent = title || 'Working…';
+    if (els.linksOverlaySub)   els.linksOverlaySub.textContent   = sub   || '';
+    els.linksOverlay.classList.add('active');
+    els.linksOverlay.setAttribute('aria-hidden', 'false');
+  }
+  function hideOverlay() {
+    if (!els.linksOverlay) return;
+    els.linksOverlay.classList.remove('active');
+    els.linksOverlay.setAttribute('aria-hidden', 'true');
+  }
+  function setOverlayText(title, sub) {
+    if (els.linksOverlayTitle) els.linksOverlayTitle.textContent = title;
+    if (els.linksOverlaySub)   els.linksOverlaySub.textContent   = sub;
+  }
+
+  function setBtnBusy(btn, busy, labelWhenBusy) {
+    if (!btn) return;
+    if (busy) {
+      btn.dataset.prevHtml = btn.innerHTML;
+      btn.innerHTML = `<span class="btn-spinner"></span>${labelWhenBusy || btn.textContent}`;
+      btn.classList.add('busy');
+      btn.disabled = true;
+    } else {
+      if (btn.dataset.prevHtml != null) btn.innerHTML = btn.dataset.prevHtml;
+      btn.classList.remove('busy');
+      btn.disabled = false;
+      delete btn.dataset.prevHtml;
+    }
+  }
+
+  // Cancel stale responses if the user re-clicks.
+  let requestSeq = 0;
+  const nextRequestId = () => ++requestSeq;
+  const isStale = (id) => id !== requestSeq;
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+  let apiKey = localStorage.getItem(CONFIG.LS_API_KEY) || '';
+
+  function showAuthOverlay(msg) {
+    if (!els.authOverlay) return;
+    if (els.authError) els.authError.textContent = msg || '';
+    els.authOverlay.classList.add('active');
+    setTimeout(() => els.authPassword && els.authPassword.focus(), 50);
+  }
+  function hideAuthOverlay() {
+    if (els.authOverlay) els.authOverlay.classList.remove('active');
+  }
+  function setApiKey(val) {
+    apiKey = val;
+    localStorage.setItem(CONFIG.LS_API_KEY, val);
+  }
+  function getApiKey() { return apiKey; }
+
+  function initAuth() {
+    if (els.authForm) {
+      els.authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const val = els.authPassword ? els.authPassword.value : '';
+        if (!val) return;
+        setApiKey(val);
+        hideAuthOverlay();
+        if (els.authPassword) els.authPassword.value = '';
+        if (els.authError) els.authError.textContent = '';
+      });
+    }
+    if (!apiKey) showAuthOverlay('');
+  }
+
+  // ============================================================
+  // HTTP — attaches X-API-Key ONLY to CONFIG.API_BASE
+  // ============================================================
+  async function http(input, init = {}) {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const needsAuth =
+      url === CONFIG.API_BASE || url.indexOf(CONFIG.API_BASE + '/') === 0;
+
+    let nextInit = init;
+    if (needsAuth && getApiKey()) {
+      nextInit = Object.assign({}, init, {
+        headers: Object.assign({}, init.headers || {}, {
+          'X-API-Key': getApiKey(),
+        }),
+      });
+    }
+
+    const res = await fetch(input, nextInit);
+    if (res.status === 401) {
+      showAuthOverlay('Wrong password. Try again.');
+    }
+    return res;
+  }
+
+  // ============================================================
+  // RENDER — 6 columns: #, cover, size, likes, posted, actions
+  // (Video key removed from view; still in data-key for Delete)
+  // ============================================================
+  
+  async function downloadVideo(videoKey, userId) {
+  const params = new URLSearchParams({
+    videoKey,
+    userId: userId || CONFIG.DEFAULT_USER,
+    disposition: 'attachment',
+  });
+  const res = await http(`${CONFIG.API_BASE}/api/download-b2-file?${params}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error);
+  
+  // Trigger the download on mobile
+  const a = document.createElement('a');
+  a.href = data.downloadUrl;
+  a.download = videoKey;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+  
+  function renderRows(items) {
+    if (!els.linksTbody) return;
+    if (!items || items.length === 0) {
+      els.linksTbody.innerHTML = '<tr><td colspan="6" class="row-empty">No links.</td></tr>';
+      return;
+    }
+
+    els.linksTbody.innerHTML = items.map((it, i) => `
+      <tr
+        data-key="${escHtml(it.videoKey)}"
+        data-video-url="${escHtml(it.videoUrl || '')}"
+        data-cover-url="${escHtml(it.coverUrl || '')}"
+      >
+        <td class="col-sno">${i + 1}</td>
+        <td class="col-cover">
+          ${it.coverUrl
+            ? `<img src="${escHtml(it.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+            : `<div class="no-cover"></div>`}
+        </td>
+        <td class="col-date hide-sm">${fmtBytes(it.fileSize)}</td>
+        <td class="col-likes hide-sm">${Number(it.likes || 0).toLocaleString()}</td>
+        <td class="col-date hide-sm">${escHtml((it.postedDate || '').slice(0, 10))}</td>
+        <td class="col-actions">
+  <button class="action-btn" data-role="copy-video">Copy Video</button>
+  <button class="action-btn" data-role="download">Download</button>
+  <button class="action-btn" data-role="copy-cover" ${it.coverUrl ? '' : 'disabled' }>Copy Cover</button>
+  <button class="action-btn danger" data-role="delete">Delete</button>
+</td>
+      </tr>
+    `).join('');
+
+    els.linksTbody.querySelectorAll('button[data-role="copy-video"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const url = b.closest('tr').getAttribute('data-video-url');
+        if (!url) { log('No video URL.', 'err'); return; }
+        const ok = await copyText(url);
+        log(ok ? 'Video URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
+      });
+    });
+    
+
+
+    els.linksTbody.querySelectorAll('button[data-role="copy-cover"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const url = b.closest('tr').getAttribute('data-cover-url');
+        if (!url) { log('No cover URL.', 'err'); return; }
+        const ok = await copyText(url);
+        log(ok ? 'Cover URL copied.' : 'Copy failed.', ok ? 'ok' : 'err');
+      });
+    });
+
+    els.linksTbody.querySelectorAll('button[data-role="delete"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const tr  = b.closest('tr');
+        const key = tr.getAttribute('data-key');
+        if (!global.confirm(`Delete row for ${key}?`)) return;
+
+        try {
+          const params = new URLSearchParams({ videoKey: key });
+          const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+          if (userId) params.set('userId', userId);
+
+          const res  = await http(`${CONFIG.API_BASE}/api/download-links?${params}`, { method: 'DELETE' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+
+          tr.remove();
+          log(`Deleted: ${key}`, 'ok');
+        } catch (err) {
+          log(`Delete failed: ${err.message}`, 'err');
+        }
+      });
+    });
+    
+    els.linksTbody.querySelectorAll('button[data-role="download"]').forEach((b) => {
+  b.addEventListener('click', async () => {
+    const key = b.closest('tr').getAttribute('data-key');
+    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+    b.disabled = true;
+    try {
+      await downloadVideo(key, userId);
+      log(`Download started: ${key}`, 'ok');
+    } catch (err) {
+      log(`Download failed: ${err.message}`, 'err');
+    } finally {
+      b.disabled = false;
+    }
+  });
+});
+  }
+
+  // ============================================================
+  // API CALLS
+  // ============================================================
+  async function load({ silent = false } = {}) {
+    const myId = nextRequestId();
+    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+
+    if (!silent) {
+      setBtnBusy(els.linksLoadBtn, true, 'Loading…');
+      showOverlay('Loading links…', 'Fetching rows from download_links_view');
+      setStatus('Loading', 'busy');
+    }
+    log(`GET ${CONFIG.API_BASE}/api/download-links-view?userId=${userId || '(default)'}`, 'info');
+
+    try {
+      const params = new URLSearchParams();
+      if (userId) params.set('userId', userId);
+
+      const res  = await http(`${CONFIG.API_BASE}/api/download-links-view?${params}`);
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      if (isStale(myId)) return;
+
+      renderRows(data.items || []);
+      const n = data.items ? data.items.length : 0;
+      setStatus(`Loaded ${n}`, 'done');
+      log(`Loaded ${n} row(s).`, 'ok');
+    } catch (err) {
+      if (isStale(myId)) return;
+      if (els.linksTbody) {
+        els.linksTbody.innerHTML = `<tr><td colspan="6" class="row-error">Failed: ${escHtml(err.message)}</td></tr>`;
+      }
+      setStatus('Failed', 'failed');
+      log(`Failed: ${err.message}`, 'err');
+    } finally {
+      if (!silent) {
+        hideOverlay();
+        setBtnBusy(els.linksLoadBtn, false);
+      }
+    }
+  }
+
+  async function sync() {
+    const myId = nextRequestId();
+    const userId = els.linksUserId ? els.linksUserId.value.trim() : '';
+
+    setBtnBusy(els.linksSyncBtn, true, 'Syncing…');
+    showOverlay('Syncing download links…', 'Signing URLs — this can take a minute.');
+    setStatus('Syncing', 'busy');
+    log(`POST ${CONFIG.API_BASE}/api/download-links/sync`, 'info');
+
+    // Heartbeat so the log keeps moving if the server is slow.
+    const heartbeat = setInterval(() => {
+      if (!isStale(myId)) log('Waiting on server…', 'wait');
+    }, 8000);
+
+    try {
+      const res = await http(`${CONFIG.API_BASE}/api/download-links/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId || undefined }),
+      });
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }));
+      if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+      if (isStale(myId)) return;
+
+      log(`Added: ${data.added} · Refreshed: ${data.refreshed} · Skipped: ${data.skipped}`, 'ok');
+      setStatus(`+${data.added} ↻${data.refreshed}`, 'done');
+
+      // Keep the overlay up between sync → load so it never flickers.
+      setOverlayText('Refreshing table…', `Sync done — ${data.added} added, ${data.refreshed} refreshed.`);
+      if (els.linksTbody) els.linksTbody.classList.add('loading');
+
+      await load({ silent: true });
+    } catch (err) {
+      if (isStale(myId)) return;
+      setStatus('Failed', 'failed');
+      log(`Sync failed: ${err.message}`, 'err');
+    } finally {
+      clearInterval(heartbeat);
+      if (els.linksTbody) els.linksTbody.classList.remove('loading');
+      hideOverlay();
+      setBtnBusy(els.linksSyncBtn, false);
+    }
+  }
+
+  // ============================================================
+  // WIRING
+  // ============================================================
+  function init() {
+    if (els.linksLoadBtn) els.linksLoadBtn.addEventListener('click', () => load());
+    if (els.linksSyncBtn) els.linksSyncBtn.addEventListener('click', () => sync());
+    initAuth();
+  }
+
+  // ============================================================
+  // EXPORT + BOOT
+  // ============================================================
+  global.AppDownloadLinks = Object.freeze({
+    init,
+    load,
+    sync,
+    showAuthOverlay,
+    hideAuthOverlay,
+    getApiKey,
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})(window);
+</script>
+</body>
+</html>
