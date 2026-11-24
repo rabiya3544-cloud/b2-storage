@@ -795,89 +795,57 @@ app.get('/api/b2-files-count', async (c) => {
 });
 
 app.get('/api/download-links-view', async (c) => {
-  try {
-    const db = turso();
-    const userId = c.req.query('userId') || 'user_123';
+  const db = turso();
+  const userId = c.req.query('userId') || 'user_123';
 
-    // Pagination is optional — if neither limit nor offset is given,
-    // behave exactly like the old endpoint (return everything).
-    const hasPagination =
-      c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
+  const hasPagination =
+    c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
 
-    const limitRaw  = Number(c.req.query('limit'));
-    const offsetRaw = Number(c.req.query('offset'));
-    const limit  = Number.isFinite(limitRaw)  && limitRaw  > 0 ? Math.min(Math.floor(limitRaw), 500) : null;
-    const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+  const ORDER = `ORDER BY likes DESC, posted_date DESC, video_key`;
 
-    // Shared ORDER BY — must match between page and count queries
-    const ORDER = `ORDER BY likes DESC, posted_date DESC, video_key`;
-
-    if (!hasPagination) {
-      const rows = await db.execute({
-        sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
-                     file_size, created_at, likes, posted_date
-              FROM download_links_view
-              WHERE user_id = ?
-              ${ORDER}`,
-        args: [userId],
-      });
-
-      return c.json({
-        success: true,
-        items: rows.rows.map(r => ({
-          videoKey:  r.video_key,
-          userId:    r.user_id,
-          coverKey:  r.cover_key,
-          videoUrl:  r.video_url,
-          coverUrl:  r.cover_url,
-          fileSize:  r.file_size,
-          createdAt: r.created_at,
-          likes:     r.likes,
-          postedDate: r.posted_date,
-        })),
-        total: rows.rows.length,
-        hasMore: false,
-      });
-    }
-
-    // Count once — small and cheap
-    const countRes = await db.execute({
-      sql: `SELECT COUNT(*) AS n FROM download_links_view WHERE user_id = ?`,
-      args: [userId],
-    });
-    const total = Number(countRes.rows[0]?.n) || 0;
-
-    const pageLimit = limit ?? 60;
+  if (!hasPagination) {
     const rows = await db.execute({
       sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
                    file_size, created_at, likes, posted_date
             FROM download_links_view
-            WHERE user_id = ?
-            ${ORDER}
-            LIMIT ? OFFSET ?`,
-      args: [userId, pageLimit, offset],
+            WHERE user_id = ? ${ORDER}`,
+      args: [userId],
     });
-
-    return c.json({
-      success: true,
-      items: rows.rows.map(r => ({
-        videoKey:  r.video_key,
-        userId:    r.user_id,
-        coverKey:  r.cover_key,
-        videoUrl:  r.video_url,
-        coverUrl:  r.cover_url,
-        fileSize:  r.file_size,
-        createdAt: r.created_at,
-        likes:     r.likes,
-        postedDate: r.posted_date,
-      })),
-      total,
-      hasMore: offset + rows.rows.length < total,
-    });
-  } catch (error) {
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json({ success: true, items: rows.rows.map(toItem), hasMore: false });
   }
+
+  const limit = Math.min(Math.max(Number(c.req.query('limit')) || 60, 1), 500);
+  const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+
+  // Fetch one extra to know if there's a next page — no COUNT(*) needed.
+  const rows = await db.execute({
+    sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
+                 file_size, created_at, likes, posted_date
+          FROM download_links_view
+          WHERE user_id = ? ${ORDER}
+          LIMIT ? OFFSET ?`,
+    args: [userId, limit + 1, offset],
+  });
+
+  const hasMore = rows.rows.length > limit;
+  const items = rows.rows.slice(0, limit).map(toItem);
+
+  return c.json({ success: true, items, hasMore });
 });
+
+function toItem(r) {
+  return {
+    videoKey: r.video_key,
+    userId: r.user_id,
+    coverKey: r.cover_key,
+    videoUrl: r.video_url,
+    coverUrl: r.cover_url,
+    fileSize: r.file_size,
+    createdAt: r.created_at,
+    likes: r.likes,
+    postedDate: r.posted_date,
+  };
+}
 
 // ═════════════════════════════════════════════════════════════════
 // TikTok posts — RPC-style bulk insert / update / summary reads
