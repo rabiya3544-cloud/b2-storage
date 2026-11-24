@@ -799,28 +799,80 @@ app.get('/api/download-links-view', async (c) => {
     const db = turso();
     const userId = c.req.query('userId') || 'user_123';
 
+    // Pagination is optional — if neither limit nor offset is given,
+    // behave exactly like the old endpoint (return everything).
+    const hasPagination =
+      c.req.query('limit') !== undefined || c.req.query('offset') !== undefined;
+
+    const limitRaw  = Number(c.req.query('limit'));
+    const offsetRaw = Number(c.req.query('offset'));
+    const limit  = Number.isFinite(limitRaw)  && limitRaw  > 0 ? Math.min(Math.floor(limitRaw), 500) : null;
+    const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+
+    // Shared ORDER BY — must match between page and count queries
+    const ORDER = `ORDER BY likes DESC, posted_date DESC, video_key`;
+
+    if (!hasPagination) {
+      const rows = await db.execute({
+        sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
+                     file_size, created_at, likes, posted_date
+              FROM download_links_view
+              WHERE user_id = ?
+              ${ORDER}`,
+        args: [userId],
+      });
+
+      return c.json({
+        success: true,
+        items: rows.rows.map(r => ({
+          videoKey:  r.video_key,
+          userId:    r.user_id,
+          coverKey:  r.cover_key,
+          videoUrl:  r.video_url,
+          coverUrl:  r.cover_url,
+          fileSize:  r.file_size,
+          createdAt: r.created_at,
+          likes:     r.likes,
+          postedDate: r.posted_date,
+        })),
+        total: rows.rows.length,
+        hasMore: false,
+      });
+    }
+
+    // Count once — small and cheap
+    const countRes = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM download_links_view WHERE user_id = ?`,
+      args: [userId],
+    });
+    const total = Number(countRes.rows[0]?.n) || 0;
+
+    const pageLimit = limit ?? 60;
     const rows = await db.execute({
       sql: `SELECT video_key, user_id, cover_key, video_url, cover_url,
                    file_size, created_at, likes, posted_date
             FROM download_links_view
             WHERE user_id = ?
-            ORDER BY likes DESC, posted_date DESC, video_key`,
-      args: [userId],
+            ${ORDER}
+            LIMIT ? OFFSET ?`,
+      args: [userId, pageLimit, offset],
     });
 
     return c.json({
       success: true,
       items: rows.rows.map(r => ({
-        videoKey: r.video_key,
-        userId: r.user_id,
-        coverKey: r.cover_key,
-        videoUrl: r.video_url,
-        coverUrl: r.cover_url,
-        fileSize: r.file_size,
+        videoKey:  r.video_key,
+        userId:    r.user_id,
+        coverKey:  r.cover_key,
+        videoUrl:  r.video_url,
+        coverUrl:  r.cover_url,
+        fileSize:  r.file_size,
         createdAt: r.created_at,
-        likes: r.likes,
+        likes:     r.likes,
         postedDate: r.posted_date,
       })),
+      total,
+      hasMore: offset + rows.rows.length < total,
     });
   } catch (error) {
     return c.json({ success: false, error: error.message }, 500);
