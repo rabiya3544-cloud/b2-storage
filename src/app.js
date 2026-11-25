@@ -616,7 +616,7 @@ app.get('/api/known-video-keys', async (c) => {
 
 // ============ download_links feature (self-contained) ============
 
-const STALE_HOURS = 48; // refresh URLs older than this; 3-day URLs get 1 day of buffer
+const STALE_HOURS = 480; // refresh URLs older than this; 3-day URLs get 1 day of buffer
 
 app.post('/api/download-links/sync', async (c) => {
   try {
